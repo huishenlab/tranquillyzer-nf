@@ -1,4 +1,4 @@
-# Tranquillyzer-nf
+# Tranquillyzer-nf (Under Construction)
 
 A reproducible Nextflow DSL2 pipeline for running the Tranquillyzer long-read single-cell RNA-seq processing workflow, supporting both Docker and Singularity/Apptainer on HPC (SLURM) and cloud GPU platforms.
 
