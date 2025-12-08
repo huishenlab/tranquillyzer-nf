@@ -42,41 +42,52 @@ params.annotate_cpus   = params.annotate_cpus   ?: 32
 params.align_cpus      = params.align_cpus      ?: 32
 params.dedup_cpus      = params.dedup_cpus      ?: 16
 
-// container image or SIF; can also be overridden per-profile
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    container image or SIF; can also be overridden per-profile
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
 params.container_trq   = params.container_trq   ?: 'varishenlab/tranquillyzer:tranquillyzer_v0.1.1_tf_2.15.1'
 
-// ----------------------
-// Import module processes
-// ----------------------
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Import module processes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
 
-include { PREPROCESS      } from './modules/preprocess.nf'
-include { ANNOTATE_READS  } from './modules/annotate_reads.nf'
-include { ALIGN           } from './modules/align.nf'
-include { DEDUP           } from './modules/dedup.nf'
+include { PREPROCESS } from './modules/preprocess.nf'
+include { READ_LENGTH_DIST_QC } from './modules/read_length_dist_qc.nf'
+include { ANNOTATE_READS } from './modules/annotate_reads.nf'
+include { ALIGN } from './modules/align.nf'
+include { DEDUP } from './modules/dedup.nf'
 
-// ----------------------
-// Channels
-// ----------------------
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Channels
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
 
-// For now, pipeline is single-run; later you can expand to multiple runs/samples
-Channel.of(
-    tuple(
-        params.run_id,
-        file(params.raw_dir),
-        file(params.work_dir)
-    )
-).set { run_ch }
+run_ch = Channel
+          .fromPath("samplesheet.tsv")
+          .splitCsv(header:true)
+          .map { row -> tuple(row.sample_id, file(row.raw_dir), file(row.work_dir), file(row.metadata)) }
 
-// ----------------------
-// Workflow definition
-// ----------------------
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Workflow definition
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
 
 workflow {
 
     // 1) Preprocess
     preprocessed_ch = PREPROCESS(run_ch)
 
-    // 2) Annotate reads (GPU)
+    // 2) Read-length distribution QC
+
+    read_length_dist_ch = READ_LENGTH_DIST_QC()
+    // 3) Annotate reads (GPU)
     annotated_ch = ANNOTATE_READS(
         preprocessed_ch,
         file(params.metadata),
@@ -88,13 +99,13 @@ workflow {
         params.gpu_mem
     )
 
-    // 3) Align
+    // 4) Align
     aligned_ch = ALIGN(
         annotated_ch,
         file(params.reference)
     )
 
-    // 4) Duplicate marking
+    // 5) Duplicate marking
     dedup_ch = DEDUP(
         aligned_ch
     )
