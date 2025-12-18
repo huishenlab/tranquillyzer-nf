@@ -4,6 +4,7 @@
 # But NOT these directories (keep them tracked)
 !tests/10x3p/data/
 !tests/10x3p/barcodes.tsv
+!tests/10x3p/samplesheet.txt
 !tests/references/
 
 # Unignore these directories + everything inside them
