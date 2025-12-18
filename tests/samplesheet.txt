@@ -1,0 +1,2 @@
+sample_id	raw_dir	work_dir	metadata
+10x3p_test	./tests/10x3p/data	./tests/10x3p	./tests/10x3p/barcodes.tsv

@@ -2,10 +2,13 @@
 *
 
 # But NOT these directories (keep them tracked)
-!tests/10x3p/data/
-!tests/10x3p/barcodes.tsv
-!tests/10x3p/samplesheet.txt
+!tests/
+tests/*
+!tests/samplesheet.txt
+!tests/10x3p/
+!tests/10x3p/**
 !tests/references/
+!tests/references/**
 
 # Unignore these directories + everything inside them
 !workflows/
