@@ -21,6 +21,14 @@ conf/*
 modules/*
 !modules/*.nf
 
+# Inside workflows folder, ignore everything except the NF module files
+workflows/*
+!workflows/*.nf
+
+# Inside workflows folder, ignore everything except the NF module files
+subworkflows/*
+!subworkflows/*.nf
+
 # Ignore work, output, and temporary directories everywhere
 *.log
 *.html
