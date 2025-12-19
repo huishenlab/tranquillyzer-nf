@@ -32,7 +32,7 @@ workflow PIPELINE_INITIALISATION {
     log.info " samplesheet   : ${samplesheet}"
     log.info " outdir        : ${outdir}"
     log.info " reference     : ${reference}"
-    log.info " seq_order_file: ${seq_order_file ?: '(not provided)'}"
+    log.info " seq_order_file: ${seq_order_file ?: 'not provided, using default'}"
     log.info "=========================================="
 
     // Parse samplesheet into a channel
