@@ -7,31 +7,29 @@ process FEATURECOUNTS_MTX {
     container params.container_trq
 
     input:
-    tuple val(sample_id), path(work_dir)
+    tuple val(sample_id), path(work_dir), path(bam_dir)
     path gtf
+    path fc_script
 
     output:
-    tuple val(sample_id), path(work_dir)
+    tuple val(sample_id), path(work_dir), path("${work_dir}/aligned_files/featurecounts")
 
     script:
-    def bam_dir = "${work_dir}/aligned_files/split_bams"
-    def out_dir = "${work_dir}/aligned_files/featurecounts"
-
     // Optional featureCounts related extra args
     def extra_opt = (params.featurecounts_extra && params.featurecounts_extra.toString().trim())
                     ? "--extra \"${params.featurecounts_extra}\""
                     : ""
 
     """
-    mkdir -p ${out_dir}
+    mkdir -p ${work_dir}/aligned_files/featurecounts
 
-    python featurecount_mtx.py \\
+    python ${fc_script} \\
       --bam-dir ${bam_dir} \\
       --gtf ${gtf} \\
-      --out-dir ${out_dir} \\
+      --out-dir ${work_dir}/aligned_files/featurecounts \\
       --threads ${task.cpus} \\
       --batch-size ${params.featurecounts_batch_size} \\
       ${extra_opt} \\
-      > ${work_dir}/aligned_files/featurecounts_mtx.log 2>&1
+      > ${work_dir}/featurecounts_mtx.log 2>&1
     """
 }
