@@ -4,7 +4,7 @@ process FEATURECOUNTS_MTX {
     label 'cpu'
 
     cpus params.featurecounts_threads
-    container params.container_trq
+    container params.container_subread
 
     input:
     tuple val(sample_id), path(work_dir), path(bam_dir)
@@ -12,7 +12,7 @@ process FEATURECOUNTS_MTX {
     path fc_script
 
     output:
-    tuple val(sample_id), path(work_dir), path("${work_dir}/aligned_files/featurecounts")
+    tuple val(sample_id), path(work_dir), path("${work_dir}/featurecounts")
 
     script:
     // Optional featureCounts related extra args
@@ -21,12 +21,12 @@ process FEATURECOUNTS_MTX {
                     : ""
 
     """
-    mkdir -p ${work_dir}/aligned_files/featurecounts
+    mkdir -p ${work_dir}/featurecounts
 
     python ${fc_script} \\
       --bam-dir ${bam_dir} \\
       --gtf ${gtf} \\
-      --out-dir ${work_dir}/aligned_files/featurecounts \\
+      --out-dir ${work_dir}/featurecounts \\
       --threads ${task.cpus} \\
       --batch-size ${params.featurecounts_batch_size} \\
       ${extra_opt} \\

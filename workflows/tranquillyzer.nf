@@ -45,7 +45,7 @@ workflow TRANQUILLYZER_PIPELINE {
     }
 
     if( params.featurecounts ) {
-        featurecounts_ch = FEATURECOUNTS_MTX(split_bam_ch, file(params.gtf), file(params.fc_script))
+        featurecounts_ch = FEATURECOUNTS_MTX(split_bam_ch, file(params.gtf), file("${projectDir}/bin/featurecount_mtx.py"))
     } else {
         featurecounts_ch = split_bam_ch
     }
