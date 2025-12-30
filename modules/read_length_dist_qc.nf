@@ -6,10 +6,10 @@ process READ_LENGTH_DIST_QC {
     container params.container_trq
 
     input:
-    tuple val(sample_id), path(work_dir), path(metadata)
+    tuple val(sample_id), val(work_dir), path(metadata)
 
     output:
-    tuple val(sample_id), path(work_dir), path(metadata)
+    tuple val(sample_id), val(work_dir), path(metadata)
 
     script:
     """

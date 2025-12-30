@@ -12,13 +12,13 @@ process SPLIT_BAM {
     container params.container_trq
 
     input:
-    tuple val(sample_id), path(work_dir), path(dup_marked_bam)
+    tuple val(sample_id), val(work_dir), val(dup_marked_bam)
     val    bucket_threads
     val    merge_threads
     val    max_open_cb_writers
 
     output:
-    tuple val(sample_id), path(work_dir), path("${work_dir}/results/${sample_id}/aligned_files/split_bams", type: 'dir')
+    tuple val(sample_id), val(work_dir), val("${work_dir}/results/${sample_id}/aligned_files/split_bams")
 
     script:
     """

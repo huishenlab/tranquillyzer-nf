@@ -7,12 +7,12 @@ process ALIGN {
     container params.container_trq
 
     input:
-    tuple val(sample_id), path(work_dir)
+    tuple val(sample_id), val(work_dir)
     path   reference
 
     output:
     // Emit BAM path as well as work_dir for downstream processes
-    tuple val(sample_id), path(work_dir), path("${work_dir}/results/${sample_id}/aligned_files/demuxed_aligned.bam")
+    tuple val(sample_id), val(work_dir), val("${work_dir}/results/${sample_id}/aligned_files/demuxed_aligned.bam")
 
     script:
     """

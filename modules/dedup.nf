@@ -7,10 +7,10 @@ process DEDUP {
     container params.container_trq
 
     input:
-    tuple val(sample_id), path(work_dir), path(bam)
+    tuple val(sample_id), val(work_dir), path(bam)
 
     output:
-    tuple val(sample_id), path(work_dir), path("${work_dir}/results/${sample_id}/aligned_files/demuxed_aligned_dup_marked.bam")
+    tuple val(sample_id), val(work_dir), val("${work_dir}/results/${sample_id}/aligned_files/demuxed_aligned_dup_marked.bam")
 
     script:
     """

@@ -7,10 +7,10 @@ process PREPROCESS {
     container params.container_trq
 
     input:
-    tuple val(sample_id), path(raw_dir), path(work_dir), path(metadata)
+    tuple val(sample_id), path(raw_dir), val(work_dir), path(metadata)
 
     output:
-    tuple val(sample_id), path(work_dir), path(metadata)
+    tuple val(sample_id), val(work_dir), path(metadata)
 
     script:
     def output_flag = params.output_bquals ? '--output-base-qual' : ''

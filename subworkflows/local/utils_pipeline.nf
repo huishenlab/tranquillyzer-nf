@@ -35,7 +35,7 @@ workflow PIPELINE_INITIALISATION {
     log.info " seq_order_file: ${seq_order_file ?: 'not provided, using default'}"
     log.info "=========================================="
     
-    def work_dir = file(outdir)
+    def work_dir = file(outdir).toAbsolutePath().toString()
 
     // Parse samplesheet into a channel
     samplesheet_ch = Channel

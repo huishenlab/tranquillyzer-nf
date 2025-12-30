@@ -7,12 +7,12 @@ process FEATURECOUNTS_MTX {
     container params.container_subread
 
     input:
-    tuple val(sample_id), path(work_dir), path(bam_dir)
+    tuple val(sample_id), val(work_dir), val(bam_dir)
     path gtf
     path fc_script
 
     output:
-    tuple val(sample_id), path(work_dir), path("${work_dir}/results/${sample_id}/featurecounts", type: 'dir')
+    tuple val(sample_id), val(work_dir), val("${work_dir}/results/${sample_id}/featurecounts")
 
     script:
     // Optional featureCounts related extra args

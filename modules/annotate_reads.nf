@@ -7,7 +7,7 @@ process ANNOTATE_READS {
     container params.container_trq
 
     input:
-    tuple val(sample_id), path(work_dir), path(metadata)
+    tuple val(sample_id), val(work_dir), path(metadata)
     val    model_name
     val    model_type
     val    chunk_size
@@ -15,7 +15,7 @@ process ANNOTATE_READS {
     val    gpu_mem
 
     output:
-    tuple val(sample_id), path(work_dir)
+    tuple val(sample_id), val(work_dir)
 
     script:
     def output_fmt = params.output_fastq ? 'fastq' : 'fasta'
