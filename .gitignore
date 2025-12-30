@@ -12,6 +12,10 @@ tests/*
 !tests/10x3p/barcodes.tsv
 !tests/references/
 !tests/references/**
+!.github/
+!.github/**
+!.github/workflows/
+!.github/workflows/**
 
 # Unignore these directories + everything inside them
 !workflows/

@@ -1,0 +1,58 @@
+name: run Pytest
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  nextflow-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    strategy:
+      fail-fast: false
+      matrix:
+        dataset: ["10x3p"]  # add "10x5p", "tranquil_seq" later
+
+    env:
+      NF_TEST_CASE: ${{ matrix.dataset }}
+      NF_TEST_OUTDIR: tests/results_ci/${{ matrix.dataset }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java (Nextflow requires it)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Nextflow
+        run: |
+          curl -s https://get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/nextflow
+          nextflow -version
+
+      - name: Run Nextflow (docker_local_cpu) for ${{ matrix.dataset }}
+        run: |
+          rm -rf "${NF_TEST_OUTDIR}"
+          nextflow run . \
+            -profile docker_local_cpu \
+            -c "conf/tests/params_${{ matrix.dataset }}.config"
+      
+      - name: Set up Python (pytest)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10.12"
+          cache: pip
+      
+      - name: Install pytest
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+      
+      - name: Run pytest
+        run: |
+          pytest -q
