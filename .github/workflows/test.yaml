@@ -1,4 +1,4 @@
-name: run Pytest
+name: run CI
 
 on:
   push:
