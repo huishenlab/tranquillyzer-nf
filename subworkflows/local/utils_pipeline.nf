@@ -7,6 +7,8 @@ workflow PIPELINE_INITIALISATION {
     samplesheet
     reference
     seq_order_file
+    container_trq
+    container_subread
 
     main:
 
@@ -33,6 +35,8 @@ workflow PIPELINE_INITIALISATION {
     log.info " outdir        : ${outdir}"
     log.info " reference     : ${reference}"
     log.info " seq_order_file: ${seq_order_file ?: 'not provided, using default'}"
+    log.info " Tranquillyzer container: ${container_trq}"
+    log.info " featureCounts container: ${container_subread}"
     log.info "=========================================="
     
     def work_dir = file(outdir).toAbsolutePath().toString()
