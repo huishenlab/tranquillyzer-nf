@@ -2,6 +2,7 @@
 *
 
 # But NOT these directories (keep them tracked)
+!LICENSE
 !tests/
 tests/*
 !bin/
