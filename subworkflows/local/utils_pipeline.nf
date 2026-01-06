@@ -6,7 +6,6 @@ workflow PIPELINE_INITIALISATION {
     outdir
     samplesheet
     reference
-    seq_order_file
     container_trq
     container_subread
 
@@ -19,12 +18,6 @@ workflow PIPELINE_INITIALISATION {
     if( !file(reference).exists() )
         exit 1, "ERROR: reference FASTA not found: ${reference}"
 
-    // seq_order_file is optional
-    if( seq_order_file && seq_order_file.toString().trim() ) {
-        if( !file(seq_order_file).exists() )
-            exit 1, "ERROR: seq_order_file set but not found: ${seq_order_file}"
-    }
-
     // Make output dir
     file(outdir).mkdirs()
 
@@ -36,7 +29,6 @@ workflow PIPELINE_INITIALISATION {
     log.info " reference                : ${reference}"
     log.info " Tranquillyzer container  : ${container_trq}"
     log.info " featureCounts container  : ${container_subread}"
-    log.info " seq_order_file           : ${seq_order_file ?: 'not provided, using default'}"
     log.info "=========================================="
     
     def work_dir = file(outdir).toAbsolutePath().toString()

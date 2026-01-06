@@ -32,7 +32,6 @@ workflow {
         params.outdir,
         params.samplesheet,
         params.reference,
-        params.seq_order_file,
         params.container_trq,
         params.container_subread
     )

@@ -20,12 +20,7 @@ workflow TRANQUILLYZER_PIPELINE {
     qc_ch = READ_LENGTH_DIST_QC(preprocessed_ch)
 
     annotated_ch = ANNOTATE_READS(
-        qc_ch,
-        params.model_name,
-        params.model_type,
-        params.chunk_size,
-        params.bc_lv_threshold,
-        params.gpu_mem
+        qc_ch
     )
 
     aligned_ch = ALIGN(
@@ -36,10 +31,7 @@ workflow TRANQUILLYZER_PIPELINE {
     dedup_ch = DEDUP(aligned_ch)
 
     if( params.split_bam ) {
-        split_bam_ch = SPLIT_BAM(dedup_ch,
-        params.bucket_threads,
-        params.merge_threads,
-        params.max_open_cb_writers)
+        split_bam_ch = SPLIT_BAM(dedup_ch)
     } else {
         split_bam_ch = dedup_ch
     }
