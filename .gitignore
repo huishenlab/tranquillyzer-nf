@@ -2,6 +2,7 @@
 *
 
 # But NOT these directories (keep them tracked)
+!CHANGELOG.md
 !LICENSE
 !tests/
 tests/*
