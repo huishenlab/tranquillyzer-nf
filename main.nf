@@ -16,12 +16,15 @@ include { PIPELINE_INITIALISATION; PIPELINE_COMPLETION } from './subworkflows/lo
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-// YAML-safe scalar
+// YAML-safe scalar with basic type preservation
 def y(v) {
     if (v == null) return "null"
+    if (v instanceof Boolean) return v ? "true" : "false"
+    if (v instanceof Number)  return v.toString()
+
     def s = v.toString()
-    s = s.replace("\\", "\\\\").replace("\"", "\\\"")
-    s = s.replace("\n", "\\n")
+    // Quote strings; escape backslash + quotes; normalize newlines
+    s = s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
     return "\"${s}\""
 }
 
@@ -53,10 +56,9 @@ def getGitDirty() {
 }
 
 /**
- * Write ONE canonical merged-params file to pipeline_info/params_effective.yml.
- * This includes:
- *   1) A small comment header with run/pipeline provenance (NOT YAML keys)
- *   2) The full resolved params map (post-merge, authoritative)
+ * Write one canonical merged-params file to pipeline_info/params_effective.yml.
+ * - Includes a comment header with run provenance
+ * - Includes resolved params (post-merge; authoritative)
  */
 def writeParamsEffective(outdir, params, headerLines=[]) {
     def infoDir = new File("${outdir}/pipeline_info")
@@ -69,11 +71,10 @@ def writeParamsEffective(outdir, params, headerLines=[]) {
         m.collect { k, v ->
             def pad = '  ' * indent
             if (v instanceof Map) {
-                "${pad}${k}:\n" + render(v, indent + 1)
+                "${pad}${k}:\n" + render(v as Map, indent + 1)
             } else if (v instanceof List) {
-                "${pad}${k}:\n" + v.collect { "${pad}  - ${y(it)}\n" }.join('')
+                "${pad}${k}:\n" + (v.collect { "${pad}  - ${y(it)}\n" }.join(''))
             } else {
-                // keep booleans/numbers as strings for safety/consistency in this simple writer
                 "${pad}${k}: ${y(v)}\n"
             }
         }.join('')
@@ -87,6 +88,42 @@ def writeParamsEffective(outdir, params, headerLines=[]) {
     text += render(params as Map)
 
     f.text = text
+}
+
+def die(msg) {
+    log.error(msg)
+    System.exit(1)
+}
+
+def validateInputs() {
+    // Required params
+    if (!params.samplesheet) die("Missing required --samplesheet")
+    if (!params.reference)  die("Missing required --reference")
+    if (!params.outdir)     die("Missing required --outdir")
+
+    // File existence checks (basic; deeper parsing in PIPELINE_INITIALISATION)
+    def ss = file(params.samplesheet)
+    if (!ss.exists()) die("Samplesheet not found: ${params.samplesheet}")
+
+    def ref = file(params.reference)
+    if (!ref.exists()) die("Reference not found: ${params.reference}")
+
+    if (params.gtf) {
+        def gtf = file(params.gtf)
+        if (!gtf.exists()) die("GTF not found: ${params.gtf}")
+    }
+
+    // Sanity: container engine selection
+    def engine = (params.container_engine ?: 'none').toString().toLowerCase()
+    def allowed = ['none','docker','singularity','apptainer']
+    if (!(engine in allowed)) {
+        die("Invalid --container_engine '${params.container_engine}'. Allowed: ${allowed.join(', ')}")
+    }
+
+    // Safety: if enable_gpu but no gpu label usage in modules, that's okay; warn
+    if (params.enable_gpu == true && (engine == 'none')) {
+        log.warn "enable_gpu=true but container_engine=none. GPU flags won't be applied."
+    }
 }
 
 /*
@@ -118,7 +155,8 @@ workflow {
           --split_bam true|false
           --featurecounts true|false
           --enable_gpu true|false
-          --executor slurm|local
+          --container_engine docker|apptainer|singularity|none
+          --executor local|slurm|awsbatch|google-lifesciences|azurebatch|kubernetes
           --version
         """.stripIndent()
         System.exit(0)
@@ -129,9 +167,12 @@ workflow {
         System.exit(0)
     }
 
+    validateInputs()
+
     log.info "tranquillyzer-nf ${pipelineVersion} (revision: ${revision}${dirty == true ? ', dirty' : ''})"
     log.info "Run name: ${workflow.runName}"
     log.info "Executor: ${params.executor ?: 'local'} | Engine: ${params.container_engine ?: 'none'} | GPU: ${params.enable_gpu == true}"
+    log.info "Outdir: ${params.outdir}"
 
     // 1) Initialization / validation / samplesheet parsing
     PIPELINE_INITIALISATION(
@@ -160,7 +201,7 @@ workflow {
         PIPELINE_INITIALISATION.out.samplesheet_ch
     )
 
-    // 3) Completion summary (optional)
+    // 3) Completion summary / publishing
     PIPELINE_COMPLETION(
         params.outdir,
         TRANQUILLYZER_PIPELINE.out.final_outputs
