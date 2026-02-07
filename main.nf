@@ -1,12 +1,6 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl = 2
 
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    tranquillyzer-nf
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
 include { TRANQUILLYZER_PIPELINE } from './workflows/tranquillyzer'
 include { PIPELINE_INITIALISATION; PIPELINE_COMPLETION } from './subworkflows/local/utils_pipeline'
 
@@ -23,7 +17,6 @@ def y(v) {
     if (v instanceof Number)  return v.toString()
 
     def s = v.toString()
-    // Quote strings; escape backslash + quotes; normalize newlines
     s = s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
     return "\"${s}\""
 }
@@ -55,11 +48,6 @@ def getGitDirty() {
     }
 }
 
-/**
- * Write one canonical merged-params file to pipeline_info/params_effective.yml.
- * - Includes a comment header with run provenance
- * - Includes resolved params (post-merge; authoritative)
- */
 def writeParamsEffective(outdir, params, headerLines=[]) {
     def infoDir = new File("${outdir}/pipeline_info")
     infoDir.mkdirs()
@@ -96,12 +84,10 @@ def die(msg) {
 }
 
 def validateInputs() {
-    // Required params
     if (!params.samplesheet) die("Missing required --samplesheet")
     if (!params.reference)  die("Missing required --reference")
     if (!params.outdir)     die("Missing required --outdir")
 
-    // File existence checks (basic; deeper parsing in PIPELINE_INITIALISATION)
     def ss = file(params.samplesheet)
     if (!ss.exists()) die("Samplesheet not found: ${params.samplesheet}")
 
@@ -113,24 +99,16 @@ def validateInputs() {
         if (!gtf.exists()) die("GTF not found: ${params.gtf}")
     }
 
-    // Sanity: container engine selection
     def engine = (params.container_engine ?: 'none').toString().toLowerCase()
     def allowed = ['none','docker','singularity','apptainer']
     if (!(engine in allowed)) {
         die("Invalid --container_engine '${params.container_engine}'. Allowed: ${allowed.join(', ')}")
     }
 
-    // Safety: if enable_gpu but no gpu label usage in modules, that's okay; warn
-    if (params.enable_gpu == true && (engine == 'none')) {
+    if (params.enable_gpu == true && engine == 'none') {
         log.warn "enable_gpu=true but container_engine=none. GPU flags won't be applied."
     }
 }
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    RUN ENTRYPOINT WORKFLOW
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
 
 workflow {
 
@@ -156,7 +134,6 @@ workflow {
           --featurecounts true|false
           --enable_gpu true|false
           --container_engine docker|apptainer|singularity|none
-          --executor local|slurm|awsbatch|google-lifesciences|azurebatch|kubernetes
           --version
         """.stripIndent()
         System.exit(0)
@@ -171,10 +148,11 @@ workflow {
 
     log.info "tranquillyzer-nf ${pipelineVersion} (revision: ${revision}${dirty == true ? ', dirty' : ''})"
     log.info "Run name: ${workflow.runName}"
-    log.info "Executor: ${params.executor ?: 'local'} | Engine: ${params.container_engine ?: 'none'} | GPU: ${params.enable_gpu == true}"
+    log.info "Profile(s): ${workflow.profile ?: 'none'}"
+    log.info "Engine: ${params.container_engine ?: 'none'} | GPU: ${params.enable_gpu == true}"
     log.info "Outdir: ${params.outdir}"
 
-    // 1) Initialization / validation / samplesheet parsing
+    // 1) Initialization / samplesheet parsing
     PIPELINE_INITIALISATION(
         params.outdir,
         params.samplesheet,
@@ -183,7 +161,7 @@ workflow {
         params.container_subread
     )
 
-    // Write ONE canonical merged params file AFTER init validation
+    // 2) Write canonical params file
     def headerLines = [
         "pipeline: tranquillyzer-nf",
         "pipeline_version: ${pipelineVersion}",
@@ -196,12 +174,12 @@ workflow {
     ]
     writeParamsEffective(params.outdir, params, headerLines)
 
-    // 2) Main pipeline
+    // 3) Main pipeline
     TRANQUILLYZER_PIPELINE(
         PIPELINE_INITIALISATION.out.samplesheet_ch
     )
 
-    // 3) Completion summary / publishing
+    // 4) Completion (blocks until final_outputs closes)
     PIPELINE_COMPLETION(
         params.outdir,
         TRANQUILLYZER_PIPELINE.out.final_outputs
