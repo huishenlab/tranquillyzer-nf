@@ -1,32 +1,32 @@
+nextflow.enable.dsl = 2
+
 process ALIGN {
 
-    tag { sample_id }
-    label 'cpu'
+  tag { sample_id }
+  label 'cpu'
 
-    container params.container_trq
+  container params.container_trq
 
-    input:
-    tuple val(sample_id), val(work_root)
-    path  reference
+  input:
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root)
+  path reference
 
-    output:
-    // Emit BAM as a staged path so downstream can use it safely
-    tuple val(sample_id), val(work_root), path("demuxed_aligned.bam")
+  output:
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path("demuxed_aligned.bam")
 
-    script:
-    """
-    set -euo pipefail
+  script:
+  """
+  set -euo pipefail
 
-    mkdir -p "${work_root}/logs"
+  mkdir -p "${log_root}/align"
 
-    tranquillyzer align \\
-      ${params.align_opts} \\
-      "${work_root}/results/${sample_id}" \\
-      "${reference}" \\
-      "${work_root}/results/${sample_id}" \\
-      > "${work_root}/logs/${sample_id}_align.log" 2>&1
+  tranquillyzer align \\
+    ${params.align_opts} \\
+    "${run_dir}" \\
+    "${reference}" \\
+    "${run_dir}" \\
+    > "${log_root}/align/${sample_id}.log" 2>&1
 
-    # Expose expected BAM as a staged output
-    cp -f "${work_root}/results/${sample_id}/aligned_files/demuxed_aligned.bam" demuxed_aligned.bam
-    """
+  cp -f "${run_dir}/aligned_files/demuxed_aligned.bam" demuxed_aligned.bam
+  """
 }

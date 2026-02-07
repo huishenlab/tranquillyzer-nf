@@ -1,35 +1,35 @@
+nextflow.enable.dsl = 2
+
 process SPLIT_BAM {
 
-    tag { sample_id }
-    label 'cpu'
+  tag { sample_id }
+  label 'cpu'
 
-    container params.container_trq
+  container params.container_trq
 
-    input:
-    tuple val(sample_id), val(work_root), path(dup_marked_bam)
+  input:
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam)
 
-    output:
-    // Emit the split-bams directory as a staged path
-    tuple val(sample_id), val(work_root), path("split_bams")
+  output:
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path("split_bams")
 
-    script:
-    """
-    set -euo pipefail
+  script:
+  """
+  set -euo pipefail
 
-    mkdir -p "${work_root}/logs"
-    mkdir -p "${work_root}/results/${sample_id}/aligned_files/split_bams"
+  mkdir -p "${log_root}/split_bam"
+  mkdir -p "${run_dir}/aligned_files/split_bams"
 
-    # Ensure input BAM is in expected location if needed
-    mkdir -p "${work_root}/results/${sample_id}/aligned_files"
-    cp -f "${dup_marked_bam}" "${work_root}/results/${sample_id}/aligned_files/demuxed_aligned_dup_marked.bam"
+  # Ensure expected location for split-bam if tool expects it
+  mkdir -p "${run_dir}/aligned_files"
+  cp -f "${dup_bam}" "${run_dir}/aligned_files/demuxed_aligned_dup_marked.bam"
 
-    tranquillyzer split-bam \\
-      ${params.split_bam_opts} \\
-      --out-dir "${work_root}/results/${sample_id}/aligned_files/split_bams" \\
-      "${work_root}/results/${sample_id}/aligned_files/demuxed_aligned_dup_marked.bam" \\
-      > "${work_root}/logs/${sample_id}_split_bam.log" 2>&1
+  tranquillyzer split-bam \\
+    ${params.split_bam_opts} \\
+    --out-dir "${run_dir}/aligned_files/split_bams" \\
+    "${run_dir}/aligned_files/demuxed_aligned_dup_marked.bam" \\
+    > "${log_root}/split_bam/${sample_id}.log" 2>&1
 
-    # Stage the directory as an output artifact
-    cp -R "${work_root}/results/${sample_id}/aligned_files/split_bams" ./split_bams
-    """
+  cp -R "${run_dir}/aligned_files/split_bams" ./split_bams
+  """
 }

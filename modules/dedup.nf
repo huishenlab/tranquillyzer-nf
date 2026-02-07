@@ -1,31 +1,33 @@
+nextflow.enable.dsl = 2
+
 process DEDUP {
 
-    tag { sample_id }
-    label 'cpu'
+  tag { sample_id }
+  label 'cpu'
 
-    container params.container_trq
+  container params.container_trq
 
-    input:
-    tuple val(sample_id), val(work_root), path(bam)
+  input:
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(aligned_bam)
 
-    output:
-    tuple val(sample_id), val(work_root), path("demuxed_aligned_dup_marked.bam")
+  output:
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path("demuxed_aligned_dup_marked.bam")
 
-    script:
-    """
-    set -euo pipefail
+  script:
+  """
+  set -euo pipefail
 
-    mkdir -p "${work_root}/logs"
+  mkdir -p "${log_root}/dedup"
 
-    # Ensure BAM is where tranquillyzer expects it (work_root/results/<sample>/aligned_files/)
-    mkdir -p "${work_root}/results/${sample_id}/aligned_files"
-    cp -f "${bam}" "${work_root}/results/${sample_id}/aligned_files/demuxed_aligned.bam"
+  # Ensure expected BAM location for tranquillyzer if it assumes a canonical path
+  mkdir -p "${run_dir}/aligned_files"
+  cp -f "${aligned_bam}" "${run_dir}/aligned_files/demuxed_aligned.bam"
 
-    tranquillyzer dedup \\
-      ${params.dedup_opts} \\
-      "${work_root}/results/${sample_id}" \\
-      > "${work_root}/logs/${sample_id}_dedup.log" 2>&1
+  tranquillyzer dedup \\
+    ${params.dedup_opts} \\
+    "${run_dir}" \\
+    > "${log_root}/dedup/${sample_id}.log" 2>&1
 
-    cp -f "${work_root}/results/${sample_id}/aligned_files/demuxed_aligned_dup_marked.bam" demuxed_aligned_dup_marked.bam
-    """
+  cp -f "${run_dir}/aligned_files/demuxed_aligned_dup_marked.bam" demuxed_aligned_dup_marked.bam
+  """
 }

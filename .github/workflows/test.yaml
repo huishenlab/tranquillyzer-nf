@@ -1,4 +1,4 @@
-name: run CI
+name: CI
 
 on:
   push:
@@ -6,54 +6,109 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  nextflow-matrix:
+  nextflow:
+    name: Nextflow (${{ matrix.dataset }})
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 90
 
     strategy:
       fail-fast: false
       matrix:
-        dataset: ["10x3p"]  # add "10x5p", "tranquil_seq" later
+        dataset: ["10x3p"]  # add later: "10x5p", "tranquil_seq"
 
     env:
+      NXF_VER: "24.10.4"
+      NXF_ANSI_LOG: false
+      NXF_OPTS: "-Xms1g -Xmx4g"
       NF_TEST_CASE: ${{ matrix.dataset }}
-      NF_TEST_OUTDIR: ./tests/${NF_TEST_CASE}/results
+
+      # Use ephemeral dirs (don’t litter repo, easier artifact capture)
+      NF_OUTDIR: ${{ github.workspace }}/tests/${{ matrix.dataset }}
+      NXF_WORK:  ${{ runner.temp }}/nf-work/${{ matrix.dataset }}
+      NXF_HOME:  ${{ runner.temp }}/nf-home
+
+      # Docker cache location for Apptainer/Singularity not needed here
+      # because CI uses docker.
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up Java (Nextflow requires it)
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Install Nextflow
+      - name: Set up Nextflow
+        uses: nf-core/setup-nextflow@v1
+        with:
+          version: ${{ env.NXF_VER }}
+
+      - name: Show versions
         run: |
-          curl -s https://get.nextflow.io | bash
-          sudo mv nextflow /usr/local/bin/nextflow
           nextflow -version
+          docker --version
 
-      - name: Run Nextflow (docker_local_cpu) for ${NF_TEST_CASE}
+      - name: Cache Nextflow + workDir
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.NXF_HOME }}
+            ${{ env.NXF_WORK }}
+          key: nf-${{ runner.os }}-${{ env.NXF_VER }}-${{ matrix.dataset }}-${{ hashFiles('**/*.nf', 'nextflow.config', 'conf/**/*.config') }}
+          restore-keys: |
+            nf-${{ runner.os }}-${{ env.NXF_VER }}-${{ matrix.dataset }}-
+            nf-${{ runner.os }}-${{ env.NXF_VER }}-
+
+      - name: Run pipeline (docker, CPU, test dataset)
         run: |
-          rm -rf "${NF_TEST_OUTDIR}"
-          nextflow run . \
-            -c "conf/tests/params_${NF_TEST_CASE}.config"
+          set -euo pipefail
 
-      ## Don't need pytest for now, as tests are run via Nextflow itself
-      
-      # - name: Set up Python (pytest)
-      #   uses: actions/setup-python@v5
-      #   with:
-      #     python-version: "3.10.12"
-      #     cache: pip
-      
-      # - name: Install pytest
-      #   run: |
-      #     python -m pip install --upgrade pip
-      #     pip install pytest
-      
-      # - name: Run pytest
-      #   run: |
-      #     pytest -q
+          mkdir -p "${NXF_HOME}" "${NXF_WORK}"
+          rm -rf "${NF_OUTDIR}"
+
+          # Prefer profiles for infra (docker) and small test configs for params.
+          # We pass outdir explicitly so ETL layout is predictable in CI.
+          nextflow run . \
+            -profile docker \
+            -work-dir "${NXF_WORK}" \
+            -c "conf/tests/params_${NF_TEST_CASE}.config" \
+            --outdir "${NF_OUTDIR}" \
+            -resume \
+            -with-report "${NF_OUTDIR}/pipeline_info/execution_report.html" \
+            -with-timeline "${NF_OUTDIR}/pipeline_info/execution_timeline.html" \
+            -with-trace "${NF_OUTDIR}/pipeline_info/execution_trace.tsv" \
+            -with-dag "${NF_OUTDIR}/pipeline_info/pipeline_dag.svg"
+
+      - name: Sanity checks (ETL outputs exist)
+        run: |
+          set -euo pipefail
+
+          test -d "${NF_OUTDIR}/extract"
+          test -d "${NF_OUTDIR}/transform"
+          test -d "${NF_OUTDIR}/load"
+          test -d "${NF_OUTDIR}/pipeline_info"
+
+          # At least one sample folder should exist under load
+          test "$(find "${NF_OUTDIR}/load" -mindepth 1 -maxdepth 1 -type d | wc -l)" -ge 1
+
+          # Example expected payloads (don’t over-constrain; keep resilient)
+          # Check that BAM exists somewhere in load/*/bam
+          test "$(find "${NF_OUTDIR}/load" -type f -name 'demuxed_aligned_dup_marked.bam' | wc -l)" -ge 1
+
+      - name: Upload artifacts (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nf-${{ matrix.dataset }}-artifacts
+          path: |
+            ${{ env.NF_OUTDIR }}/pipeline_info/**
+            ${{ env.NF_OUTDIR }}/logs/**
+            .nextflow.log
+          if-no-files-found: warn
