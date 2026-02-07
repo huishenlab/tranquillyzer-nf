@@ -1,3 +1,4 @@
+// workflows/tranquillyzer.nf
 nextflow.enable.dsl = 2
 
 include { PREPROCESS          } from '../modules/preprocess'
@@ -15,13 +16,24 @@ workflow TRANQUILLYZER_PIPELINE {
 
     main:
 
+    /*
+     * Fail fast on required inputs (keeps workflow self-contained even if main.nf validates too)
+     */
+    if( !params.reference ) {
+        error "Missing required --reference (FASTA)."
+    }
+    if( !file(params.reference).exists() ) {
+        error "Reference FASTA not found: ${params.reference}"
+    }
+
+    /*
+     * Main pipeline
+     */
     preprocessed_ch = PREPROCESS(run_ch)
 
     qc_ch = READ_LENGTH_DIST_QC(preprocessed_ch)
 
-    annotated_ch = ANNOTATE_READS(
-        qc_ch
-    )
+    annotated_ch = ANNOTATE_READS(qc_ch)
 
     aligned_ch = ALIGN(
         annotated_ch,
@@ -36,8 +48,29 @@ workflow TRANQUILLYZER_PIPELINE {
         split_bam_ch = dedup_ch
     }
 
+    /*
+     * featureCounts matrix generation (optional)
+     * - If enabled, require --gtf and validate existence to avoid file(null) crashes.
+     */
     if( params.featurecounts ) {
-        featurecounts_ch = FEATURECOUNTS_MTX(split_bam_ch, file(params.gtf), file("${projectDir}/bin/featurecount_mtx.py"))
+
+        if( !params.gtf ) {
+            error "featurecounts=true but --gtf was not provided. Provide --gtf <path> or set --featurecounts false."
+        }
+        if( !file(params.gtf).exists() ) {
+            error "GTF not found: ${params.gtf}"
+        }
+
+        def fc_script = "${projectDir}/bin/featurecount_mtx.py"
+        if( !file(fc_script).exists() ) {
+            error "featureCounts helper script not found: ${fc_script}"
+        }
+
+        featurecounts_ch = FEATURECOUNTS_MTX(
+            split_bam_ch,
+            file(params.gtf),
+            file(fc_script)
+        )
     } else {
         featurecounts_ch = split_bam_ch
     }
