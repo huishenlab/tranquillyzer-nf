@@ -25,6 +25,12 @@ jobs:
       NF_TEST_CASE: ${{ matrix.dataset }}
       NF_TEST_OUTDIR: tests/${{ matrix.dataset }}/results
 
+      TRQ_IMAGE: varishenlab/tranquillyzer:tranquillyzer_v0.2.1_tf2.15.0
+      SUBREAD_IMAGE: varishenlab/featurecounts:subread2.0.6_py3.10.12
+
+      # Where we store tarballs for actions/cache
+      DOCKER_TAR_DIR: .docker-cache
+
     steps:
       - uses: actions/checkout@v4
 
@@ -52,71 +58,77 @@ jobs:
           test -f "tests/references/hg38_gencode_chr21.fa"
           test -f "tests/references/gencode.v30.annotation_chr21.gtf"
 
-      # IMPORTANT: free runner disk (docker save tarballs are huge)
-      - name: Free disk space
-        run: |
-          set -euo pipefail
-          echo "== Before cleanup =="
-          df -h
-
-          # Remove large preinstalled toolchains we don't need
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android || true
-          sudo apt-get clean || true
-
-          # Clean docker junk (safe on fresh runners; helpful on cache hits too)
-          docker system prune -af --volumes || true
-
-          echo "== After cleanup =="
-          df -h
-
-      - name: Cache Docker images (compressed tar.gz)
-        uses: actions/cache@v4
+      # 1) Restore cache early
+      - name: Restore Docker image tarballs
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
-          path: .docker-cache
-          key: docker-images-${{ runner.os }}-trq_v0.2.1_tf2.15.0-subread_2.0.6_py3.10.12-v1
+          path: ${{ env.DOCKER_TAR_DIR }}
+          key: docker-images-${{ runner.os }}-${{ env.TRQ_IMAGE }}-${{ env.SUBREAD_IMAGE }}-v1
 
       - name: Load cached images (if present)
         run: |
           set -euo pipefail
-          mkdir -p .docker-cache
-          if [ -f .docker-cache/trq.tar.gz ]; then
-            echo "Loading cached tranquillyzer image..."
-            gunzip -c .docker-cache/trq.tar.gz | docker load
-          fi
-          if [ -f .docker-cache/subread.tar.gz ]; then
-            echo "Loading cached featurecounts image..."
-            gunzip -c .docker-cache/subread.tar.gz | docker load
+          mkdir -p "${DOCKER_TAR_DIR}"
+
+          if [ -f "${DOCKER_TAR_DIR}/trq.tar" ]; then
+            echo "[cache] loading trq.tar"
+            docker load -i "${DOCKER_TAR_DIR}/trq.tar"
           fi
 
-      - name: Pull images (if missing) and save compressed to cache
+          if [ -f "${DOCKER_TAR_DIR}/subread.tar" ]; then
+            echo "[cache] loading subread.tar"
+            docker load -i "${DOCKER_TAR_DIR}/subread.tar"
+          fi
+
+          docker image ls | head
+
+      # 2) Pull only if not already loaded, and ONLY save tar if missing
+      - name: Ensure images are available; save tarballs only when missing
         run: |
           set -euo pipefail
-          mkdir -p .docker-cache
+          mkdir -p "${DOCKER_TAR_DIR}"
 
-          # Pull only if not already present (from cache load)
-          docker image inspect varishenlab/tranquillyzer:tranquillyzer_v0.2.1_tf2.15.0 >/dev/null 2>&1 || \
-            docker pull varishenlab/tranquillyzer:tranquillyzer_v0.2.1_tf2.15.0
+          if ! docker image inspect "${TRQ_IMAGE}" >/dev/null 2>&1; then
+            echo "[pull] ${TRQ_IMAGE}"
+            docker pull "${TRQ_IMAGE}"
+          else
+            echo "[ok] already have ${TRQ_IMAGE}"
+          fi
 
-          docker image inspect varishenlab/featurecounts:subread2.0.6_py3.10.12 >/dev/null 2>&1 || \
-            docker pull varishenlab/featurecounts:subread2.0.6_py3.10.12
+          if ! docker image inspect "${SUBREAD_IMAGE}" >/dev/null 2>&1; then
+            echo "[pull] ${SUBREAD_IMAGE}"
+            docker pull "${SUBREAD_IMAGE}"
+          else
+            echo "[ok] already have ${SUBREAD_IMAGE}"
+          fi
 
-          echo "Disk before docker save:"
-          df -h
+          # Only docker-save if tar missing (this is the expensive part you were re-doing)
+          if [ ! -f "${DOCKER_TAR_DIR}/trq.tar" ]; then
+            echo "[save] writing trq.tar"
+            docker save "${TRQ_IMAGE}" -o "${DOCKER_TAR_DIR}/trq.tar"
+          else
+            echo "[skip] trq.tar already exists"
+          fi
 
-          # Save compressed (much smaller; avoids 'no space left on device')
-          docker save varishenlab/tranquillyzer:tranquillyzer_v0.2.1_tf2.15.0 | gzip -1 > .docker-cache/trq.tar.gz
-          docker save varishenlab/featurecounts:subread2.0.6_py3.10.12 | gzip -1 > .docker-cache/subread.tar.gz
+          if [ ! -f "${DOCKER_TAR_DIR}/subread.tar" ]; then
+            echo "[save] writing subread.tar"
+            docker save "${SUBREAD_IMAGE}" -o "${DOCKER_TAR_DIR}/subread.tar"
+          else
+            echo "[skip] subread.tar already exists"
+          fi
 
-          echo "Cache contents:"
-          ls -lah .docker-cache
-
-          echo "Disk after docker save:"
-          df -h
+      # 3) Save cache immediately after tarballs exist (not only at end)
+      - name: Save Docker image tarballs cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ${{ env.DOCKER_TAR_DIR }}
+          key: docker-images-${{ runner.os }}-${{ env.TRQ_IMAGE }}-${{ env.SUBREAD_IMAGE }}-v1
 
       - name: Run Nextflow (local CPU) for ${{ matrix.dataset }}
         run: |
           set -euo pipefail
-
           rm -rf "${NF_TEST_OUTDIR}"
 
           nextflow run . \
