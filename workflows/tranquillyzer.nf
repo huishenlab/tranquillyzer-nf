@@ -60,17 +60,17 @@ workflow TRANQUILLYZER_PIPELINE {
   /*
    * FEATURECOUNTS
    * input:  (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir)
-   * output: (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, featurecounts_dir)
+   * output: (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, counts_matrix_tsv_str)
    */
   if( params.featurecounts ) {
     fc_ch = FEATURECOUNTS_MTX(split_ch, gtf_file, fc_script)
       .map { sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, counts_matrix_tsv ->
-        tuple(sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, "${run_dir}/featurecounts")
+        tuple(sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, counts_matrix_tsv.toString())
       }
   } else {
-    // add an empty featurecounts placeholder so LOAD_RESULTS always receives 7-tuple
+    // add an empty featurecounts matrix placeholder so LOAD_RESULTS always receives 7-tuple
     fc_ch = split_ch.map { sid, run_dir, load_root, log_root, dup_bam, split_bams_dir ->
-      tuple(sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, file("."))
+      tuple(sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, "")
     }
   }
 

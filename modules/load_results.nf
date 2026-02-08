@@ -13,7 +13,7 @@ process LOAD_RESULTS {
         path(log_root),
         path(dup_bam),
         val(split_bams_dir_str),
-        val(featurecounts_dir_str)
+        val(counts_matrix_tsv_str)
 
   output:
   tuple val(sample_id), path("${sample_id}_load_dir")
@@ -51,11 +51,11 @@ process LOAD_RESULTS {
   fi
 
   # -------------------------
-  # LOAD: featureCounts (optional)
+  # LOAD: featureCounts matrix (optional)
   # -------------------------
-  if [ -n "${featurecounts_dir_str}" ] && [ -d "${featurecounts_dir_str}" ]; then
+  if [ -n "${counts_matrix_tsv_str}" ] && [ -f "${counts_matrix_tsv_str}" ]; then
     mkdir -p "\${DEST}/featurecounts"
-    cp -R "${featurecounts_dir_str}/." "\${DEST}/featurecounts/" || true
+    cp -f "${counts_matrix_tsv_str}" "\${DEST}/featurecounts/counts_matrix.tsv" || true
   fi
 
   # -------------------------
