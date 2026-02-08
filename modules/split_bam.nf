@@ -3,11 +3,13 @@ process SPLIT_BAM {
   tag { sample_id }
   label 'cpu'
 
+  container params.container_trq
+
   input:
   tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam)
 
   output:
-  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path("split_bams", type: 'dir')
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path("split_bams")
 
   script:
   """
@@ -15,8 +17,9 @@ process SPLIT_BAM {
 
   mkdir -p "${log_root}/split_bam"
   mkdir -p "${run_dir}/aligned_files/split_bams"
-  mkdir -p "${run_dir}/aligned_files"
 
+  # Ensure expected location for split-bam if tool expects it
+  mkdir -p "${run_dir}/aligned_files"
   cp -f "${dup_bam}" "${run_dir}/aligned_files/demuxed_aligned_dup_marked.bam"
 
   tranquillyzer split-bam \\
