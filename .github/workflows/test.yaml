@@ -66,5 +66,4 @@ jobs:
             --gtf tests/references/gencode.v30.annotation_chr21.gtf \
             --outdir tests/10x3p \
             --enable_gpu false \
-            --cleanup_transform true \
-            --featurecounts true
+            --cleanup_transform true
