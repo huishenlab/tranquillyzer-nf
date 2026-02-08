@@ -52,30 +52,66 @@ jobs:
           test -f "tests/references/hg38_gencode_chr21.fa"
           test -f "tests/references/gencode.v30.annotation_chr21.gtf"
 
-      - name: Cache Docker images (tar)
+      # IMPORTANT: free runner disk (docker save tarballs are huge)
+      - name: Free disk space
+        run: |
+          set -euo pipefail
+          echo "== Before cleanup =="
+          df -h
+
+          # Remove large preinstalled toolchains we don't need
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android || true
+          sudo apt-get clean || true
+
+          # Clean docker junk (safe on fresh runners; helpful on cache hits too)
+          docker system prune -af --volumes || true
+
+          echo "== After cleanup =="
+          df -h
+
+      - name: Cache Docker images (compressed tar.gz)
         uses: actions/cache@v4
         with:
           path: .docker-cache
-          key: docker-images-${{ runner.os }}-v1
+          key: docker-images-${{ runner.os }}-trq_v0.2.1_tf2.15.0-subread_2.0.6_py3.10.12-v1
 
       - name: Load cached images (if present)
         run: |
           set -euo pipefail
           mkdir -p .docker-cache
-          if [ -f .docker-cache/trq.tar ]; then docker load -i .docker-cache/trq.tar; fi
-          if [ -f .docker-cache/subread.tar ]; then docker load -i .docker-cache/subread.tar; fi
+          if [ -f .docker-cache/trq.tar.gz ]; then
+            echo "Loading cached tranquillyzer image..."
+            gunzip -c .docker-cache/trq.tar.gz | docker load
+          fi
+          if [ -f .docker-cache/subread.tar.gz ]; then
+            echo "Loading cached featurecounts image..."
+            gunzip -c .docker-cache/subread.tar.gz | docker load
+          fi
 
-      - name: Pull images (if missing) and save to cache
+      - name: Pull images (if missing) and save compressed to cache
         run: |
           set -euo pipefail
+          mkdir -p .docker-cache
+
+          # Pull only if not already present (from cache load)
           docker image inspect varishenlab/tranquillyzer:tranquillyzer_v0.2.1_tf2.15.0 >/dev/null 2>&1 || \
             docker pull varishenlab/tranquillyzer:tranquillyzer_v0.2.1_tf2.15.0
 
           docker image inspect varishenlab/featurecounts:subread2.0.6_py3.10.12 >/dev/null 2>&1 || \
             docker pull varishenlab/featurecounts:subread2.0.6_py3.10.12
 
-          docker save varishenlab/tranquillyzer:tranquillyzer_v0.2.1_tf2.15.0 -o .docker-cache/trq.tar
-          docker save varishenlab/featurecounts:subread2.0.6_py3.10.12 -o .docker-cache/subread.tar
+          echo "Disk before docker save:"
+          df -h
+
+          # Save compressed (much smaller; avoids 'no space left on device')
+          docker save varishenlab/tranquillyzer:tranquillyzer_v0.2.1_tf2.15.0 | gzip -1 > .docker-cache/trq.tar.gz
+          docker save varishenlab/featurecounts:subread2.0.6_py3.10.12 | gzip -1 > .docker-cache/subread.tar.gz
+
+          echo "Cache contents:"
+          ls -lah .docker-cache
+
+          echo "Disk after docker save:"
+          df -h
 
       - name: Run Nextflow (local CPU) for ${{ matrix.dataset }}
         run: |
