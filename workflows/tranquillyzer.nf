@@ -12,7 +12,8 @@ include { LOAD_RESULTS        } from '../modules/load_results'
 workflow TRANQUILLYZER_PIPELINE {
 
   take:
-  run_ch  // (sample_id, raw_dir, run_dir, load_root, log_root, metadata)
+  // (sample_id, raw_dir, run_dir, load_root, log_root, metadata)
+  run_ch
 
   main:
 
@@ -22,9 +23,10 @@ workflow TRANQUILLYZER_PIPELINE {
 
   def gtf_file = null
   def fc_script = null
+
   if( params.featurecounts ) {
     if( !params.split_bam ) {
-      error "featurecounts=true requires split_bam=true (needs a BAM directory)."
+      error "featurecounts=true requires split_bam=true (needs split BAM directory)."
     }
     if( !params.gtf ) error "featurecounts=true but --gtf was not provided."
     gtf_file = file(params.gtf)
@@ -41,55 +43,38 @@ workflow TRANQUILLYZER_PIPELINE {
   dedup_ch       = DEDUP(aligned_ch)
 
   /*
-   * split-bam stage
+   * SPLIT_BAM
+   * input:  (sid, run_dir, load_root, log_root, dup_bam)
+   * output: (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir)
    */
   if( params.split_bam ) {
-    split_bam_ch = SPLIT_BAM(dedup_ch)
-    // split_bam_ch emits:
-    // (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir)
+    split_ch = SPLIT_BAM(dedup_ch)
   } else {
-    // Make it uniform for downstream:
-    // (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir_str, featurecounts_dir_str)
-    split_bam_ch = dedup_ch.map { sid, run_dir, load_root, log_root, dup_bam ->
-      tuple(sid, run_dir, load_root, log_root, dup_bam, "", "")
+    // if split_bam is disabled, create an empty placeholder dir in the task workdir
+    // (featurecounts is already gated behind split_bam=true, so this is mainly for LOAD_RESULTS)
+    split_ch = dedup_ch.map { sid, run_dir, load_root, log_root, dup_bam ->
+      tuple(sid, run_dir, load_root, log_root, dup_bam, file("."))
     }
   }
 
   /*
-   * featurecounts stage
+   * FEATURECOUNTS
+   * input:  (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir)
+   * output: (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, featurecounts_dir)
    */
   if( params.featurecounts ) {
-    featurecounts_ch = FEATURECOUNTS_MTX(split_bam_ch, gtf_file, fc_script)
-      .map { sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, featurecounts_dir ->
-        tuple(
-          sid,
-          run_dir,
-          load_root,
-          log_root,
-          dup_bam,
-          split_bams_dir.toString(),
-          featurecounts_dir.toString()
-        )
-      }
+    fc_ch = FEATURECOUNTS_MTX(split_ch, gtf_file, fc_script)
   } else {
-    // split_bam_ch might be either SPLIT_BAM output or the pass-through; normalize:
-    // Case 1: split_bam enabled → split_bam_ch has split dir path
-    // Case 2: split_bam disabled → split_bam_ch already has strings
-    featurecounts_ch = split_bam_ch.map { x ->
-      if( x.size() == 6 ) {
-        def (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir) = x
-        tuple(sid, run_dir, load_root, log_root, dup_bam, split_bams_dir.toString(), "")
-      } else {
-        // already normalized (sid, run_dir, load_root, log_root, dup_bam, split_str, fc_str)
-        x
-      }
+    // add an empty featurecounts placeholder so LOAD_RESULTS always receives 7-tuple
+    fc_ch = split_ch.map { sid, run_dir, load_root, log_root, dup_bam, split_bams_dir ->
+      tuple(sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, file("."))
     }
   }
 
   /*
-   * LOAD stage (curate deliverables into outdir/load/)
+   * LOAD stage
    */
-  loaded_ch = LOAD_RESULTS(featurecounts_ch)
+  loaded_ch = LOAD_RESULTS(fc_ch)
 
   emit:
   final_outputs = loaded_ch

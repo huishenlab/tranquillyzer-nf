@@ -5,16 +5,15 @@ process FEATURECOUNTS_MTX {
   tag "${sample_id}"
   label 'subread'
 
-  // container comes from nextflow.config via label 'subread'
-  // container params.container_subread
-
   input:
-  tuple val(sample_id), path(run_dir), path(split_bams_dir), path(log_root)
+  // (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir)
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path(split_bams_dir)
   path gtf
   path fc_script
 
   output:
-  tuple val(sample_id), path(run_dir), path("featurecounts")
+  // (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, featurecounts_dir)
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path(split_bams_dir), path("featurecounts", type: 'dir')
 
   script:
   """
@@ -23,7 +22,6 @@ process FEATURECOUNTS_MTX {
   mkdir -p "${log_root}/featurecounts"
   mkdir -p featurecounts
 
-  # Run featureCounts matrix generation into the OUTPUT dir directly
   python "${fc_script}" \\
     --bam-dir "${split_bams_dir}" \\
     --gtf "${gtf}" \\
@@ -31,7 +29,7 @@ process FEATURECOUNTS_MTX {
     ${params.featurecounts_opts} \\
     > "${log_root}/featurecounts/${sample_id}.log" 2>&1
 
-  # Sentinel ensures Nextflow always detects the directory output
+  # Sentinel ensures directory is never "empty" and always detectable
   echo "OK" > featurecounts/.nf_success
   """
 }
