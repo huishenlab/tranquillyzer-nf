@@ -15,8 +15,6 @@ process FEATURECOUNTS_MTX {
   // (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, featurecounts_dir)
   tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path(split_bams_dir), path("featurecounts", type: 'dir')
 
-  publishDir { "${run_dir}/featurecounts" }, mode: 'copy', overwrite: true
-
   script:
   """
   set -euo pipefail
