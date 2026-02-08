@@ -39,7 +39,7 @@ jobs:
         run: |
           rm -rf "${NF_TEST_OUTDIR}"
           nextflow run . \
-            -c "conf/tests/params_${NF_TEST_CASE}.config \
+            -c "conf/tests/params_${NF_TEST_CASE}.config" \
             -profile local \
             --samplesheet tests/samplesheet.txt \
             --reference tests/references/hg38_gencode_chr21.fa \
