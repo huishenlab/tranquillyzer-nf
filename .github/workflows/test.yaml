@@ -60,6 +60,7 @@ jobs:
 
           nextflow run . \
             -profile docker \
+            
             -c conf/tests/params_${NF_TEST_CASE}.config \
             --samplesheet tests/samplesheet.txt \
             --reference tests/references/hg38_gencode_chr21.fa \
