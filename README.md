@@ -35,7 +35,7 @@ This separation improves reproducibility, debuggability, and downstream usabilit
 
 ## Requirements
 
-- **Nextflow** (recommended ≥ 23.x)
+- **Nextflow** (recommended ≥ >=25.04.7)
 - One container runtime:
   - **Docker**, or
   - **Singularity / Apptainer**
