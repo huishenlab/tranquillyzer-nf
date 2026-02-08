@@ -3,11 +3,14 @@ process LOAD_RESULTS {
   tag { sample_id }
   label 'cpu'
 
-  // You can remove container entirely; this step only does cp/mkdir
-  // container params.container_trq
-
   input:
-  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path(split_bams_dir), path(featurecounts_dir)
+  tuple val(sample_id),
+        val(run_dir),
+        val(load_root),
+        val(log_root),
+        val(dup_bam),
+        val(split_bams_dir),
+        val(featurecounts_dir)
 
   output:
   tuple val(sample_id), path("${sample_id}_load_dir")
@@ -22,13 +25,11 @@ process LOAD_RESULTS {
 
   cp -f "${dup_bam}" "\${DEST}/bam/demuxed_aligned_dup_marked.bam"
 
-  # split_bams_dir may be an empty placeholder; only copy if real dir exists
   if [ -n "${split_bams_dir}" ] && [ -d "${split_bams_dir}" ]; then
     mkdir -p "\${DEST}/split_bams"
     cp -R "${split_bams_dir}/." "\${DEST}/split_bams/" || true
   fi
 
-  # featurecounts_dir may be an empty placeholder; only copy if real dir exists
   if [ -n "${featurecounts_dir}" ] && [ -d "${featurecounts_dir}" ]; then
     mkdir -p "\${DEST}/featurecounts"
     cp -R "${featurecounts_dir}/." "\${DEST}/featurecounts/" || true

@@ -6,10 +6,10 @@ process DEDUP {
   container params.container_trq
 
   input:
-  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(aligned_bam)
+  tuple val(sample_id), val(run_dir), val(load_root), val(log_root), val(aligned_bam)
 
   output:
-  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path("demuxed_aligned_dup_marked.bam")
+  tuple val(sample_id), val(run_dir), val(load_root), val(log_root), val("demuxed_aligned_dup_marked.bam")
 
   script:
   """
@@ -17,7 +17,6 @@ process DEDUP {
 
   mkdir -p "${log_root}/dedup"
 
-  # Ensure expected BAM location for tranquillyzer if it assumes a canonical path
   mkdir -p "${run_dir}/aligned_files"
   cp -f "${aligned_bam}" "${run_dir}/aligned_files/demuxed_aligned.bam"
 
@@ -27,5 +26,6 @@ process DEDUP {
     > "${log_root}/dedup/${sample_id}.log" 2>&1
 
   cp -f "${run_dir}/aligned_files/demuxed_aligned_dup_marked.bam" demuxed_aligned_dup_marked.bam
+  test -s demuxed_aligned_dup_marked.bam
   """
 }

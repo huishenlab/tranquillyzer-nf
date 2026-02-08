@@ -59,7 +59,6 @@ jobs:
           rm -rf "${NF_TEST_OUTDIR}"
 
           nextflow run . \
-            -resume \
             -profile docker \
             -c conf/tests/params_${NF_TEST_CASE}.config \
             --samplesheet tests/samplesheet.txt \

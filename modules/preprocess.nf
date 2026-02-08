@@ -6,10 +6,10 @@ process PREPROCESS {
   container params.container_trq
 
   input:
-  tuple val(sample_id), path(raw_dir), path(run_dir), path(load_root), path(log_root), path(metadata)
+  tuple val(sample_id), path(raw_dir), val(run_dir), val(load_root), val(log_root), path(metadata)
 
   output:
-  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(metadata)
+  tuple val(sample_id), val(run_dir), val(load_root), val(log_root), path(metadata)
 
   script:
   """
