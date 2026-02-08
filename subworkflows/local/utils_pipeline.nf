@@ -44,21 +44,21 @@ process WRITE_NORMALIZED_SAMPLESHEET {
 workflow PIPELINE_INITIALISATION {
 
   take:
-  outdir
-  samplesheet
-  reference
-  container_trq
-  container_subread
+  outdir_in
+  samplesheet_in
+  reference_in
+  container_trq_in
+  container_subread_in
 
   main:
 
-  if( !outdir )      error "Missing required --outdir"
-  if( !samplesheet ) error "Missing required --samplesheet"
-  if( !reference )   error "Missing required --reference"
+  if( !outdir_in )      error "Missing required --outdir"
+  if( !samplesheet_in ) error "Missing required --samplesheet"
+  if( !reference_in )   error "Missing required --reference"
 
-  def outdir_path       = file(outdir)
-  def samplesheet_path  = file(samplesheet)
-  def reference_path    = file(reference)
+  def outdir_path      = file(outdir_in)
+  def samplesheet_path = file(samplesheet_in)
+  def reference_path   = file(reference_in)
 
   if( !samplesheet_path.exists() )
     error "Samplesheet not found: ${samplesheet_path}"
@@ -83,8 +83,8 @@ workflow PIPELINE_INITIALISATION {
   log.info " samplesheet              : ${samplesheet_path}"
   log.info " outdir                   : ${outdir_path}"
   log.info " reference                : ${reference_path}"
-  log.info " Tranquillyzer container  : ${container_trq}"
-  log.info " featureCounts container  : ${container_subread}"
+  log.info " Tranquillyzer container  : ${container_trq_in}"
+  log.info " featureCounts container  : ${container_subread_in}"
   log.info " ETL extract_root         : ${extract_root}"
   log.info " ETL transform_root       : ${transform_root}"
   log.info " ETL load_root            : ${load_root}"
@@ -122,11 +122,9 @@ workflow PIPELINE_INITIALISATION {
 
   /*
    * Write normalized samplesheet deterministically into Extract.
-   * We create a textual table and write it via a process (reproducible & ordered).
    */
   norm_text_ch = parsed_ch
     .map { sid, raw_dir, run_dir, load_root2, log_root2, meta ->
-      // one TSV row per sample
       "${sid}\t${raw_dir.toAbsolutePath()}\t${meta.toAbsolutePath()}\t${run_dir.toAbsolutePath()}"
     }
     .collect()
@@ -145,12 +143,12 @@ workflow PIPELINE_INITIALISATION {
 workflow PIPELINE_COMPLETION {
 
   take:
-  outdir
+  outdir_in
   final_outputs
 
   main:
 
-  def outdir_path = file(outdir)
+  def outdir_path = file(outdir_in)
 
   if( final_outputs == null ) {
     log.warn "PIPELINE_COMPLETION: final_outputs is null (no outputs produced)."
