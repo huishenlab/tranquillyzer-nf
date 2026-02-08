@@ -7,10 +7,6 @@ on:
     branches: [main, dev]
   workflow_dispatch:
 
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   nextflow-matrix:
     runs-on: ubuntu-latest
@@ -25,11 +21,9 @@ jobs:
       NF_TEST_CASE: ${{ matrix.dataset }}
       NF_TEST_OUTDIR: tests/${{ matrix.dataset }}/results
 
-      TRQ_IMAGE: varishenlab/tranquillyzer:tranquillyzer_v0.2.1_tf2.15.0
-      SUBREAD_IMAGE: varishenlab/featurecounts:subread2.0.6_py3.10.12
-
-      # Where we store tarballs for actions/cache
-      DOCKER_TAR_DIR: .docker-cache
+      # IMPORTANT: make apptainer cache stable + cacheable
+      NXF_APPTAINER_CACHEDIR: ${{ github.workspace }}/.apptainer-cache
+      NXF_SINGULARITY_CACHEDIR: ${{ github.workspace }}/.apptainer-cache
 
     steps:
       - uses: actions/checkout@v4
@@ -47,6 +41,18 @@ jobs:
           sudo mv nextflow /usr/local/bin/nextflow
           nextflow -version
 
+      - name: Install Apptainer
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y apptainer
+
+      - name: Cache Apptainer images
+        uses: actions/cache@v4
+        with:
+          path: .apptainer-cache
+          key: apptainer-images-${{ runner.os }}-v1
+
       - name: Debug - show test config and inputs
         run: |
           set -euo pipefail
@@ -57,83 +63,17 @@ jobs:
           test -f "tests/samplesheet.txt"
           test -f "tests/references/hg38_gencode_chr21.fa"
           test -f "tests/references/gencode.v30.annotation_chr21.gtf"
+          mkdir -p .apptainer-cache
+          ls -lah .apptainer-cache || true
 
-      # 1) Restore cache early
-      - name: Restore Docker image tarballs
-        id: cache-restore
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ env.DOCKER_TAR_DIR }}
-          key: docker-images-${{ runner.os }}-${{ env.TRQ_IMAGE }}-${{ env.SUBREAD_IMAGE }}-v1
-
-      - name: Load cached images (if present)
-        run: |
-          set -euo pipefail
-          mkdir -p "${DOCKER_TAR_DIR}"
-
-          if [ -f "${DOCKER_TAR_DIR}/trq.tar" ]; then
-            echo "[cache] loading trq.tar"
-            docker load -i "${DOCKER_TAR_DIR}/trq.tar"
-          fi
-
-          if [ -f "${DOCKER_TAR_DIR}/subread.tar" ]; then
-            echo "[cache] loading subread.tar"
-            docker load -i "${DOCKER_TAR_DIR}/subread.tar"
-          fi
-
-          docker image ls | head
-
-      # 2) Pull only if not already loaded, and ONLY save tar if missing
-      - name: Ensure images are available; save tarballs only when missing
-        run: |
-          set -euo pipefail
-          mkdir -p "${DOCKER_TAR_DIR}"
-
-          if ! docker image inspect "${TRQ_IMAGE}" >/dev/null 2>&1; then
-            echo "[pull] ${TRQ_IMAGE}"
-            docker pull "${TRQ_IMAGE}"
-          else
-            echo "[ok] already have ${TRQ_IMAGE}"
-          fi
-
-          if ! docker image inspect "${SUBREAD_IMAGE}" >/dev/null 2>&1; then
-            echo "[pull] ${SUBREAD_IMAGE}"
-            docker pull "${SUBREAD_IMAGE}"
-          else
-            echo "[ok] already have ${SUBREAD_IMAGE}"
-          fi
-
-          # Only docker-save if tar missing (this is the expensive part you were re-doing)
-          if [ ! -f "${DOCKER_TAR_DIR}/trq.tar" ]; then
-            echo "[save] writing trq.tar"
-            docker save "${TRQ_IMAGE}" -o "${DOCKER_TAR_DIR}/trq.tar"
-          else
-            echo "[skip] trq.tar already exists"
-          fi
-
-          if [ ! -f "${DOCKER_TAR_DIR}/subread.tar" ]; then
-            echo "[save] writing subread.tar"
-            docker save "${SUBREAD_IMAGE}" -o "${DOCKER_TAR_DIR}/subread.tar"
-          else
-            echo "[skip] subread.tar already exists"
-          fi
-
-      # 3) Save cache immediately after tarballs exist (not only at end)
-      - name: Save Docker image tarballs cache
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: ${{ env.DOCKER_TAR_DIR }}
-          key: docker-images-${{ runner.os }}-${{ env.TRQ_IMAGE }}-${{ env.SUBREAD_IMAGE }}-v1
-
-      - name: Run Nextflow (local CPU) for ${{ matrix.dataset }}
+      - name: Run Nextflow (apptainer) for ${{ matrix.dataset }}
         run: |
           set -euo pipefail
           rm -rf "${NF_TEST_OUTDIR}"
 
           nextflow run . \
             -resume \
-            -profile docker \
+            -profile apptainer \
             -c conf/tests/params_${NF_TEST_CASE}.config \
             --samplesheet tests/samplesheet.txt \
             --reference tests/references/hg38_gencode_chr21.fa \
