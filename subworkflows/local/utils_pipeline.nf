@@ -1,7 +1,5 @@
-nextflow.enable.dsl = 2
-
 /*
- * ETL layout created under outdir:
+ * ETL layout created under outdir (side-effect only):
  *   outdir/
  *     extract/
  *     transform/
@@ -9,8 +7,8 @@ nextflow.enable.dsl = 2
  *     logs/
  *     pipeline_info/
  *
- * Emits a channel with tuples:
- *   (sample_id, raw_dir, run_dir, load_root, log_root, metadata)
+ * Emits a channel with tuples (OLD SHAPE):
+ *   (sample_id, raw_dir, work_dir, metadata)
  */
 
 process WRITE_NORMALIZED_SAMPLESHEET {
@@ -66,7 +64,7 @@ workflow PIPELINE_INITIALISATION {
   if( !reference_path.exists() )
     error "Reference FASTA not found: ${reference_path}"
 
-  // Create ETL root structure
+  // Create ETL root structure (side effects only)
   outdir_path.mkdirs()
   def out_abs = outdir_path.toAbsolutePath().toString()
 
@@ -74,11 +72,12 @@ workflow PIPELINE_INITIALISATION {
   def transform_root = file("${out_abs}/transform")
   def load_root      = file("${out_abs}/load")
   def log_root       = file("${out_abs}/logs")
+  def info_root      = file("${out_abs}/pipeline_info")
 
-  [extract_root, transform_root, load_root, log_root].each { it.mkdirs() }
+  [extract_root, transform_root, load_root, log_root, info_root].each { it.mkdirs() }
 
   log.info "=========================================="
-  log.info " Tranquillyzer-NF initialisation (ETL)"
+  log.info " Tranquillyzer-NF initialisation (ETL roots created)"
   log.info "=========================================="
   log.info " samplesheet              : ${samplesheet_path}"
   log.info " outdir                   : ${outdir_path}"
@@ -89,11 +88,14 @@ workflow PIPELINE_INITIALISATION {
   log.info " ETL transform_root       : ${transform_root}"
   log.info " ETL load_root            : ${load_root}"
   log.info " ETL log_root             : ${log_root}"
+  log.info " ETL pipeline_info        : ${info_root}"
   log.info "=========================================="
 
   /*
    * Parse samplesheet TSV (header required).
    * Required columns: sample_id, raw_dir, metadata
+   *
+   * work_dir is the absolute outdir (same as old pipeline behavior).
    */
   parsed_ch = Channel
     .fromPath(samplesheet_path.toString(), checkIfExists: true)
@@ -110,30 +112,28 @@ workflow PIPELINE_INITIALISATION {
       if( !raw_dir.exists() )  error "raw_dir not found for sample '${sample_id}': ${raw_dir}"
       if( !metadata.exists() ) error "metadata file not found for sample '${sample_id}': ${metadata}"
 
-      // Persistent per-sample run directory (Transform)
-      def run_dir = file("${transform_root}/${sample_id}/run")
-      run_dir.mkdirs()
+      def work_dir = out_abs  // <-- old behavior: everything under outdir
 
-      tuple(sample_id, raw_dir, run_dir, load_root, log_root, metadata)
+      tuple(sample_id, raw_dir, work_dir, metadata)
     }
     .ifEmpty {
       error "Samplesheet parsed to 0 rows. Ensure TSV header + required columns: sample_id, raw_dir, metadata."
     }
 
   /*
-   * Write normalized samplesheet deterministically into Extract.
+   * Normalized samplesheet written into Extract.
+   * Match the emitted tuple shape: include work_dir (not run_dir).
    */
   norm_text_ch = parsed_ch
-    .map { sid, raw_dir, run_dir, load_root2, log_root2, meta ->
-      "${sid}\t${raw_dir.toAbsolutePath()}\t${meta.toAbsolutePath()}\t${run_dir.toAbsolutePath()}"
+    .map { sid, raw_dir, work_dir, meta ->
+      "${sid}\t${raw_dir.toAbsolutePath()}\t${meta.toAbsolutePath()}\t${work_dir}"
     }
     .collect()
     .map { rows ->
-      def header = "sample_id\traw_dir\tmetadata\trun_dir"
+      def header = "sample_id\traw_dir\tmetadata\twork_dir"
       ( [header] + rows ).join("\n") + "\n"
     }
 
-  // Launch the writer process (side effect into outdir/extract)
   WRITE_NORMALIZED_SAMPLESHEET(outdir_path, samplesheet_path, norm_text_ch)
 
   emit:
@@ -159,7 +159,7 @@ workflow PIPELINE_COMPLETION {
     .collect()
     .map { outs ->
       log.info "=========================================="
-      log.info " Tranquillyzer-NF completed (ETL)"
+      log.info " Tranquillyzer-NF completed"
       log.info "=========================================="
       log.info " Results in: ${outdir_path}"
       log.info " Outputs emitted: ${outs.size()}"

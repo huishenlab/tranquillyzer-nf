@@ -1,26 +1,24 @@
 process ANNOTATE_READS {
 
-  tag { sample_id }
+  tag "${sample_id}"
   label 'gpu'
 
-  container params.container_trq
-
   input:
-  tuple val(sample_id), val(run_dir), val(load_root), val(log_root), path(metadata)
+  tuple val(sample_id), val(work_dir), path(metadata)
 
   output:
-  tuple val(sample_id), val(run_dir), val(load_root), val(log_root)
+  tuple val(sample_id), val(work_dir)
 
   script:
   """
   set -euo pipefail
 
-  mkdir -p "${log_root}/annotate_reads"
+  mkdir -p "${work_dir}/logs"
 
   tranquillyzer annotate-reads \\
     ${params.annotate_reads_opts} \\
-    "${run_dir}" \\
+    "${work_dir}/results/${sample_id}" \\
     "${metadata}" \\
-    > "${log_root}/annotate_reads/${sample_id}.log" 2>&1
+    > "${work_dir}/logs/${sample_id}_annotate_reads.log" 2>&1
   """
 }

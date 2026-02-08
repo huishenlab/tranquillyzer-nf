@@ -1,41 +1,34 @@
 process FEATURECOUNTS_MTX {
 
-  tag { sample_id }
+  tag "${sample_id}"
   label 'subread'
 
   input:
-  tuple val(sample_id), val(run_dir), val(load_root), val(log_root), val(dup_bam), val(split_bams_dir)
+  tuple val(sample_id), val(work_dir), val(bam_dir)
   path gtf
   path fc_script
 
   output:
-  tuple val(sample_id),
-        val(run_dir),
-        val(load_root),
-        val(log_root),
-        val(dup_bam),
-        val(split_bams_dir),
-        val("featurecounts")
+  tuple val(sample_id), val(work_dir), val("${work_dir}/results/${sample_id}/featurecounts")
 
   script:
   """
   set -euo pipefail
 
-  mkdir -p "${log_root}/featurecounts"
+  mkdir -p "${work_dir}/logs"
+  mkdir -p "${work_dir}/results/${sample_id}/featurecounts"
 
-  rm -rf featurecounts
-  mkdir -p featurecounts
+  echo "[debug] bam_dir=${bam_dir}" > "${work_dir}/logs/${sample_id}_featurecounts_mtx.log"
+  ls -lah "${bam_dir}" >> "${work_dir}/logs/${sample_id}_featurecounts_mtx.log" 2>&1 || true
 
   python "${fc_script}" \\
-    --bam-dir "${split_bams_dir}" \\
+    --bam-dir "${bam_dir}" \\
     --gtf "${gtf}" \\
-    --out-dir "featurecounts" \\
+    --out-dir "${work_dir}/results/${sample_id}/featurecounts" \\
     ${params.featurecounts_opts} \\
-    > "${log_root}/featurecounts/${sample_id}.log" 2>&1
+    >> "${work_dir}/logs/${sample_id}_featurecounts_mtx.log" 2>&1
 
-  echo "OK" > featurecounts/.nf_success
-
-  test -d featurecounts
-  ls -lah featurecounts >> "${log_root}/featurecounts/${sample_id}.log"
+  # guard
+  test -d "${work_dir}/results/${sample_id}/featurecounts"
   """
 }
