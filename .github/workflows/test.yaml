@@ -56,8 +56,7 @@ jobs:
         with:
           path: |
             ~/.nextflow
-            ${{ github.workspace }}/.nf-work
-          key: nf-${{ runner.os }}-${{ env.NXF_VER }}-${{ matrix.dataset }}-${{ hashFiles('**/*.nf', 'nextflow.config', 'conf/**/*.config') }}
+          key: nf-${{ runner.os }}-${{ env.NXF_VER }}-${{ matrix.dataset }}-${{ hashFiles('**/*.nf', 'nextflow.config', 'conf/**/*.config', '.github/workflows/test.yaml') }}
           restore-keys: |
             nf-${{ runner.os }}-${{ env.NXF_VER }}-${{ matrix.dataset }}-
             nf-${{ runner.os }}-${{ env.NXF_VER }}-
@@ -66,21 +65,20 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Use runner temp at runtime (not in expressions)
           export NXF_HOME="${RUNNER_TEMP}/nf-home"
           export NXF_WORK="${RUNNER_TEMP}/nf-work/${NF_TEST_CASE}"
 
           mkdir -p "${NXF_HOME}" "${NXF_WORK}"
           rm -rf "${NF_OUTDIR}"
 
-          # Also keep a workspace work dir for caching (optional)
-          mkdir -p "${GITHUB_WORKSPACE}/.nf-work"
-
           nextflow run . \
             -profile docker \
             -work-dir "${NXF_WORK}" \
+            -c "conf/tests/params_${NF_TEST_CASE}.config" \
             --outdir "${NF_OUTDIR}" \
-            -resume \
+            --enable_gpu false \
+            --cleanup_transform true \
+            --featurecounts true \
             -with-report "${NF_OUTDIR}/pipeline_info/execution_report.html" \
             -with-timeline "${NF_OUTDIR}/pipeline_info/execution_timeline.html" \
             -with-trace "${NF_OUTDIR}/pipeline_info/execution_trace.tsv" \
@@ -98,7 +96,7 @@ jobs:
           # At least one sample folder should exist under load
           test "$(find "${NF_OUTDIR}/load" -mindepth 1 -maxdepth 1 -type d | wc -l)" -ge 1
 
-          # BAM exists somewhere in load/*/bam
+          # Example expected payloads (keep resilient)
           test "$(find "${NF_OUTDIR}/load" -type f -name 'demuxed_aligned_dup_marked.bam' | wc -l)" -ge 1
 
       - name: Upload artifacts (always)
