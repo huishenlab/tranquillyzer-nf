@@ -1,128 +1,89 @@
-nextflow.enable.dsl = 2
-
 process LOAD_RESULTS {
 
-  tag { sample_id }
-  label 'host'   // run on host (no container) so we can see real filesystem paths
+  tag "${sample_id}"
+  label 'host' 
+
+  container null
 
   input:
-  // Always present:
-  tuple val(sample_id),
-        path(run_dir),
-        path(load_root),
-        path(log_root),
-        path(dup_bam),
-        val(split_bams_dir_str),
-        val(featurecounts_dir_str)
+  tuple val(sample_id), val(work_dir), val(featurecounts_dir)
 
   output:
-  tuple val(sample_id), path("${sample_id}_load_dir")
+  tuple val(sample_id), val("${work_dir}/load/${sample_id}")
 
   script:
   """
   set -euo pipefail
 
-  DEST="${load_root}/${sample_id}"
-  mkdir -p "\${DEST}/bam"
-  mkdir -p "\${DEST}/reports"
-  mkdir -p "\${DEST}/annotations"
+  # ETL roots
+  mkdir -p "${work_dir}/extract" "${work_dir}/transform" "${work_dir}/load" "${work_dir}/pipeline_info"
+  mkdir -p "${work_dir}/transform/results" "${work_dir}/transform/logs"
 
-  # -------------------------
-  # LOAD: final BAM
-  # -------------------------
-  cp -f "${dup_bam}" "\${DEST}/bam/demuxed_aligned_dup_marked.bam"
-
-  # -------------------------
-  # LOAD: dedup stats TSV (optional but expected)
-  # Path (per your note): run_dir/aligned_files/demuxed_aligned_dup_marked_stats.tsv
-  # -------------------------
-  if [ -f "${run_dir}/aligned_files/demuxed_aligned_dup_marked_stats.tsv" ]; then
-    cp -f "${run_dir}/aligned_files/demuxed_aligned_dup_marked_stats.tsv" "\${DEST}/bam/demuxed_aligned_dup_marked_stats.tsv"
-  else
-    echo "WARN: stats file not found at ${run_dir}/aligned_files/demuxed_aligned_dup_marked_stats.tsv" >&2
+  # Mirror old structure into transform/ (idempotent; safe with -resume)
+  if [ -d "${work_dir}/results" ]; then
+    rm -rf "${work_dir}/transform/results"
+    mkdir -p "${work_dir}/transform/results"
+    cp -a "${work_dir}/results/." "${work_dir}/transform/results/"
   fi
 
-  # -------------------------
-  # LOAD: split BAMs (optional)
-  # -------------------------
-  if [ -n "${split_bams_dir_str}" ] && [ -d "${split_bams_dir_str}" ]; then
-    mkdir -p "\${DEST}/split_bams"
-    cp -R "${split_bams_dir_str}/." "\${DEST}/split_bams/" || true
+  if [ -d "${work_dir}/logs" ]; then
+    rm -rf "${work_dir}/transform/logs"
+    mkdir -p "${work_dir}/transform/logs"
+    cp -a "${work_dir}/logs/." "${work_dir}/transform/logs/"
   fi
 
-  # -------------------------
-  # LOAD: featureCounts (optional)
-  # -------------------------
-  if [ -n "${featurecounts_dir_str}" ] && [ -d "${featurecounts_dir_str}" ]; then
-    mkdir -p "\${DEST}/featurecounts"
-    cp -R "${featurecounts_dir_str}/." "\${DEST}/featurecounts/" || true
+  # Curated load tree per sample
+  DEST="${work_dir}/load/${sample_id}"
+  mkdir -p "\${DEST}/bam" "\${DEST}/reports" "\${DEST}/split_bams" "\${DEST}/featurecounts" "\${DEST}/tables"
+
+  SAMPLE_ROOT="${work_dir}/transform/results/${sample_id}"
+  ALN_DIR="\${SAMPLE_ROOT}/aligned_files"
+
+  # 1) Final BAM
+  if [ -f "\${ALN_DIR}/demuxed_aligned_dup_marked.bam" ]; then
+    cp -f "\${ALN_DIR}/demuxed_aligned_dup_marked.bam" "\${DEST}/bam/"
   fi
 
-  # -------------------------
-  # LOAD: annotation parquets
-  # Your files typically exist under run_dir or run_dir/results/...
-  # Try direct paths first, then fallback to find.
-  # -------------------------
-  copied_any=0
-
-  for f in annotations_valid.parquet annotations_invalid.parquet; do
-    if [ -f "${run_dir}/\$f" ]; then
-      cp -f "${run_dir}/\$f" "\${DEST}/annotations/\$f"
-      copied_any=1
-      continue
-    fi
-
-    p=\$(find "${run_dir}" -type f -name "\$f" 2>/dev/null | head -n 1 || true)
-    if [ -n "\$p" ] && [ -f "\$p" ]; then
-      cp -f "\$p" "\${DEST}/annotations/\$f"
-      copied_any=1
-    fi
-  done
-
-  if [ "\$copied_any" -eq 0 ]; then
-    echo "WARN: No annotation parquet files found under ${run_dir}" >&2
-    echo "INFO: Listing top-level of run_dir for debugging:" >&2
-    ls -la "${run_dir}" >&2 || true
+  # 2) Split BAMs
+  if [ -d "\${ALN_DIR}/split_bams" ]; then
+    cp -a "\${ALN_DIR}/split_bams/." "\${DEST}/split_bams/" || true
   fi
 
-  # -------------------------
-  # LOAD: plots (optional)
-  # -------------------------
-  if [ -d "${run_dir}/plots" ]; then
+  # 3) featurecounts (prefer explicit input dir when provided)
+  if [ -n "${featurecounts_dir}" ] && [ -d "${featurecounts_dir}" ]; then
+    cp -a "${featurecounts_dir}/." "\${DEST}/featurecounts/" || true
+  elif [ -d "\${SAMPLE_ROOT}/featurecounts" ]; then
+    cp -a "\${SAMPLE_ROOT}/featurecounts/." "\${DEST}/featurecounts/" || true
+  fi
+
+  # 4) Annotation parquet outputs
+  if [ -f "\${SAMPLE_ROOT}/annotations_valid.parquet" ]; then
+    cp -f "\${SAMPLE_ROOT}/annotations_valid.parquet" "\${DEST}/tables/"
+  fi
+  if [ -f "\${SAMPLE_ROOT}/annotations_invalid.parquet" ]; then
+    cp -f "\${SAMPLE_ROOT}/annotations_invalid.parquet" "\${DEST}/tables/"
+  fi
+
+  # 5) Read-count summary tables
+  if [ -f "\${SAMPLE_ROOT}/cellId_readCount.tsv" ]; then
+    cp -f "\${SAMPLE_ROOT}/cellId_readCount.tsv" "\${DEST}/tables/"
+  fi
+  if [ -f "\${SAMPLE_ROOT}/matchType_readCount.tsv" ]; then
+    cp -f "\${SAMPLE_ROOT}/matchType_readCount.tsv" "\${DEST}/tables/"
+  fi
+
+  # 6) Alignment stats TSV (if produced)
+  if [ -f "\${ALN_DIR}/demuxed_aligned_dup_marked_stats.tsv" ]; then
+    cp -f "\${ALN_DIR}/demuxed_aligned_dup_marked_stats.tsv" "\${DEST}/tables/"
+  fi
+
+  # 7) Plots (optional)
+  if [ -d "\${SAMPLE_ROOT}/plots" ]; then
     mkdir -p "\${DEST}/reports/plots"
-    cp -R "${run_dir}/plots/." "\${DEST}/reports/plots/" || true
+    cp -a "\${SAMPLE_ROOT}/plots/." "\${DEST}/reports/plots/" || true
   fi
 
-  # -------------------------
-  # Optional cleanup: remove copied deliverables from TRANSFORM
-  # -------------------------
-  if [[ "${params.cleanup_transform}" == "true" ]]; then
-    echo "cleanup_transform=true: removing loaded deliverables from transform (run_dir=${run_dir})" >&2
-
-    # final BAM(s)
-    rm -f "${run_dir}/aligned_files/demuxed_aligned_dup_marked.bam" 2>/dev/null || true
-    rm -f "${run_dir}/aligned_files/demuxed_aligned_dup_marked.bam.bai" 2>/dev/null || true
-
-    # dedup stats
-    rm -f "${run_dir}/aligned_files/demuxed_aligned_dup_marked_stats.tsv" 2>/dev/null || true
-
-    # split bams
-    rm -rf "${run_dir}/aligned_files/split_bams" 2>/dev/null || true
-
-    # featurecounts
-    rm -rf "${run_dir}/featurecounts" 2>/dev/null || true
-
-    # annotation parquets (direct)
-    rm -f "${run_dir}/annotations_valid.parquet" "${run_dir}/annotations_invalid.parquet" 2>/dev/null || true
-
-    # annotation parquets (anywhere under run_dir, just in case)
-    for f in annotations_valid.parquet annotations_invalid.parquet; do
-      find "${run_dir}" -type f -name "\$f" -exec rm -f {} + 2>/dev/null || true
-    done
-  fi
-
-  # Emit a staged artifact pointing to the load dir
-  mkdir -p "${sample_id}_load_dir"
-  printf "%s\\n" "\${DEST}" > "${sample_id}_load_dir/LOAD_PATH.txt"
+  # Stable marker artifact
+  echo "\${DEST}" > "\${DEST}/LOAD_PATH.txt"
   """
 }
