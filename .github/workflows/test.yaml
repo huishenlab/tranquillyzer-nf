@@ -52,6 +52,31 @@ jobs:
           test -f "tests/references/hg38_gencode_chr21.fa"
           test -f "tests/references/gencode.v30.annotation_chr21.gtf"
 
+      - name: Cache Docker images (tar)
+        uses: actions/cache@v4
+        with:
+          path: .docker-cache
+          key: docker-images-${{ runner.os }}-v1
+
+      - name: Load cached images (if present)
+        run: |
+          set -euo pipefail
+          mkdir -p .docker-cache
+          if [ -f .docker-cache/trq.tar ]; then docker load -i .docker-cache/trq.tar; fi
+          if [ -f .docker-cache/subread.tar ]; then docker load -i .docker-cache/subread.tar; fi
+
+      - name: Pull images (if missing) and save to cache
+        run: |
+          set -euo pipefail
+          docker image inspect varishenlab/tranquillyzer:tranquillyzer_v0.2.1_tf2.15.0 >/dev/null 2>&1 || \
+            docker pull varishenlab/tranquillyzer:tranquillyzer_v0.2.1_tf2.15.0
+
+          docker image inspect varishenlab/featurecounts:subread2.0.6_py3.10.12 >/dev/null 2>&1 || \
+            docker pull varishenlab/featurecounts:subread2.0.6_py3.10.12
+
+          docker save varishenlab/tranquillyzer:tranquillyzer_v0.2.1_tf2.15.0 -o .docker-cache/trq.tar
+          docker save varishenlab/featurecounts:subread2.0.6_py3.10.12 -o .docker-cache/subread.tar
+
       - name: Run Nextflow (local CPU) for ${{ matrix.dataset }}
         run: |
           set -euo pipefail

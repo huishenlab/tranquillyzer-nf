@@ -2,13 +2,12 @@ process SPLIT_BAM {
 
   tag { sample_id }
   label 'cpu'
-  container params.container_trq
 
   input:
   tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam)
 
   output:
-  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path("${run_dir}/split_bams", type: 'dir')
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path("split_bams", type: 'dir')
 
   script:
   """
@@ -26,6 +25,6 @@ process SPLIT_BAM {
     "${run_dir}/aligned_files/demuxed_aligned_dup_marked.bam" \\
     > "${log_root}/split_bam/${sample_id}.log" 2>&1
 
-  cp -R "${run_dir}/aligned_files/split_bams" ${run_dir}/split_bams
+  cp -R "${run_dir}/aligned_files/split_bams" ./split_bams
   """
 }
