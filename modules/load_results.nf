@@ -1,13 +1,8 @@
 process LOAD_RESULTS {
 
   tag "${sample_id}"
-  label 'cpu'
+  label 'host' 
 
-  /*
-   * Run on host to avoid container mount surprises when moving files around.
-   * If you really want it in a container, you can set container params.container_trq,
-   * but host is safer for “mv/cp” across the whole outdir.
-   */
   container null
 
   input:
@@ -21,56 +16,74 @@ process LOAD_RESULTS {
   set -euo pipefail
 
   # ETL roots
-  mkdir -p "${work_dir}/extract"
-  mkdir -p "${work_dir}/transform"
-  mkdir -p "${work_dir}/load"
-  mkdir -p "${work_dir}/pipeline_info"
+  mkdir -p "${work_dir}/extract" "${work_dir}/transform" "${work_dir}/load" "${work_dir}/pipeline_info"
+  mkdir -p "${work_dir}/transform/results" "${work_dir}/transform/logs"
 
-  # Move (or copy) the "old world" into transform/
-  # Keep it idempotent if -resume:
-  mkdir -p "${work_dir}/transform/results"
-  mkdir -p "${work_dir}/transform/logs"
-
-  # results/
+  # Mirror old structure into transform/ (idempotent; safe with -resume)
   if [ -d "${work_dir}/results" ]; then
-    rsync -a --delete "${work_dir}/results/" "${work_dir}/transform/results/"
+    rm -rf "${work_dir}/transform/results"
+    mkdir -p "${work_dir}/transform/results"
+    cp -a "${work_dir}/results/." "${work_dir}/transform/results/"
   fi
 
-  # logs/
   if [ -d "${work_dir}/logs" ]; then
-    rsync -a --delete "${work_dir}/logs/" "${work_dir}/transform/logs/"
+    rm -rf "${work_dir}/transform/logs"
+    mkdir -p "${work_dir}/transform/logs"
+    cp -a "${work_dir}/logs/." "${work_dir}/transform/logs/"
   fi
 
   # Curated load tree per sample
   DEST="${work_dir}/load/${sample_id}"
-  mkdir -p "\${DEST}/bam"
-  mkdir -p "\${DEST}/reports"
-  mkdir -p "\${DEST}/split_bams"
-  mkdir -p "\${DEST}/featurecounts"
+  mkdir -p "\${DEST}/bam" "\${DEST}/reports" "\${DEST}/split_bams" "\${DEST}/featurecounts" "\${DEST}/tables"
 
-  # final BAM if present
-  if [ -f "${work_dir}/transform/results/${sample_id}/aligned_files/demuxed_aligned_dup_marked.bam" ]; then
-    cp -f "${work_dir}/transform/results/${sample_id}/aligned_files/demuxed_aligned_dup_marked.bam" "\${DEST}/bam/"
+  SAMPLE_ROOT="${work_dir}/transform/results/${sample_id}"
+  ALN_DIR="\${SAMPLE_ROOT}/aligned_files"
+
+  # 1) Final BAM
+  if [ -f "\${ALN_DIR}/demuxed_aligned_dup_marked.bam" ]; then
+    cp -f "\${ALN_DIR}/demuxed_aligned_dup_marked.bam" "\${DEST}/bam/"
   fi
 
-  # split bams if present
-  if [ -d "${work_dir}/transform/results/${sample_id}/aligned_files/split_bams" ]; then
-    rsync -a "${work_dir}/transform/results/${sample_id}/aligned_files/split_bams/" "\${DEST}/split_bams/" || true
+  # 2) Split BAMs
+  if [ -d "\${ALN_DIR}/split_bams" ]; then
+    cp -a "\${ALN_DIR}/split_bams/." "\${DEST}/split_bams/" || true
   fi
 
-  # featurecounts if enabled/present
+  # 3) featurecounts (prefer explicit input dir when provided)
   if [ -n "${featurecounts_dir}" ] && [ -d "${featurecounts_dir}" ]; then
-    rsync -a "${featurecounts_dir}/" "\${DEST}/featurecounts/" || true
-  elif [ -d "${work_dir}/transform/results/${sample_id}/featurecounts" ]; then
-    rsync -a "${work_dir}/transform/results/${sample_id}/featurecounts/" "\${DEST}/featurecounts/" || true
+    cp -a "${featurecounts_dir}/." "\${DEST}/featurecounts/" || true
+  elif [ -d "\${SAMPLE_ROOT}/featurecounts" ]; then
+    cp -a "\${SAMPLE_ROOT}/featurecounts/." "\${DEST}/featurecounts/" || true
   fi
 
-  # Optional plots
-  if [ -d "${work_dir}/transform/results/${sample_id}/plots" ]; then
-    rsync -a "${work_dir}/transform/results/${sample_id}/plots/" "\${DEST}/reports/plots/" || true
+  # 4) Annotation parquet outputs
+  if [ -f "\${SAMPLE_ROOT}/annotations_valid.parquet" ]; then
+    cp -f "\${SAMPLE_ROOT}/annotations_valid.parquet" "\${DEST}/tables/"
+  fi
+  if [ -f "\${SAMPLE_ROOT}/annotations_invalid.parquet" ]; then
+    cp -f "\${SAMPLE_ROOT}/annotations_invalid.parquet" "\${DEST}/tables/"
   fi
 
-  # Emit a marker file so Nextflow can track something stable
+  # 5) Read-count summary tables
+  if [ -f "\${SAMPLE_ROOT}/cellId_readCount.tsv" ]; then
+    cp -f "\${SAMPLE_ROOT}/cellId_readCount.tsv" "\${DEST}/tables/"
+  fi
+  if [ -f "\${SAMPLE_ROOT}/matchType_readCount.tsv" ]; then
+    cp -f "\${SAMPLE_ROOT}/matchType_readCount.tsv" "\${DEST}/tables/"
+  fi
+
+  # 6) Alignment stats TSV (if produced)
+  if [ -f "\${ALN_DIR}/demuxed_aligned_dup_marked_stats.tsv" ]; then
+    cp -f "\${ALN_DIR}/demuxed_aligned_dup_marked_stats.tsv" "\${DEST}/tables/"
+  fi
+
+  # 7) Plots (optional)
+  if [ -d "\${SAMPLE_ROOT}/plots" ]; then
+    mkdir -p "\${DEST}/reports/plots"
+    cp -a "\${SAMPLE_ROOT}/plots/." "\${DEST}/reports/plots/" || true
+  fi
+
+  # Stable marker artifact
   echo "\${DEST}" > "\${DEST}/LOAD_PATH.txt"
   """
 }
