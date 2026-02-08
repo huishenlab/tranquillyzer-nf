@@ -1,10 +1,13 @@
 env:
+  NF_TEST_CASE: ${{ matrix.dataset }}
+  NF_TEST_OUTDIR: tests/${{ matrix.dataset }}/results
+  # Cache location for Singularity/Apptainer images
   NXF_SINGULARITY_CACHEDIR: ${{ github.workspace }}/.singularity-cache
 
 steps:
   - uses: actions/checkout@v4
 
-  - name: Set up Java
+  - name: Set up Java (Nextflow requires it)
     uses: actions/setup-java@v4
     with:
       distribution: temurin
@@ -17,22 +20,37 @@ steps:
       sudo mv nextflow /usr/local/bin/nextflow
       nextflow -version
 
-  - name: Install SingularityCE
+  - name: Install SingularityCE (container engine)
     run: |
       set -euo pipefail
       sudo apt-get update
       sudo apt-get install -y singularity-container
       singularity --version
 
+  - name: Debug - show test config and inputs
+    run: |
+      set -euo pipefail
+      echo "Workspace: $GITHUB_WORKSPACE"
+      ls -lah conf/tests || true
+      ls -lah tests || true
+      test -f "conf/tests/params_${NF_TEST_CASE}.config"
+      test -f "tests/samplesheet.txt"
+      test -f "tests/references/hg38_gencode_chr21.fa"
+      test -f "tests/references/gencode.v30.annotation_chr21.gtf"
+
   - name: Cache Singularity images
     uses: actions/cache@v4
     with:
       path: .singularity-cache
-      key: singularity-images-${{ runner.os }}-v1
+      key: singularity-images-${{ runner.os }}-${{ matrix.dataset }}-v1
 
-  - name: Run Nextflow (singularity) for ${{ matrix.dataset }}
+  - name: Run Nextflow (local CPU) for ${{ matrix.dataset }}
     run: |
       set -euo pipefail
+
+      rm -rf "${NF_TEST_OUTDIR}"
+      mkdir -p "${NXF_SINGULARITY_CACHEDIR}"
+
       nextflow run . \
         -resume \
         -profile singularity \
