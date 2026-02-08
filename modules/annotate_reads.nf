@@ -1,22 +1,28 @@
+nextflow.enable.dsl = 2
+
 process ANNOTATE_READS {
 
-    tag "${sample_id}"
-    label 'gpu'
+  tag { sample_id }
+  label 'gpu'
 
-    container params.container_trq
+  container params.container_trq
 
-    input:
-    tuple val(sample_id), val(work_dir), path(metadata)
+  input:
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(metadata)
 
-    output:
-    tuple val(sample_id), val(work_dir)
+  output:
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root)
 
-    script:
-    """
-    tranquillyzer annotate-reads \\
-      ${params.annotate_reads_opts} \\
-      ${work_dir}/results/${sample_id} \\
-      ${metadata} \\
-    > ${work_dir}/logs/${sample_id}_annotate_reads.log 2>&1
-    """
+  script:
+  """
+  set -euo pipefail
+
+  mkdir -p "${log_root}/annotate_reads"
+
+  tranquillyzer annotate-reads \\
+    ${params.annotate_reads_opts} \\
+    "${run_dir}" \\
+    "${metadata}" \\
+    > "${log_root}/annotate_reads/${sample_id}.log" 2>&1
+  """
 }

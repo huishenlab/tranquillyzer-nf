@@ -1,24 +1,32 @@
+nextflow.enable.dsl = 2
+
 process ALIGN {
 
-    tag "${sample_id}"
-    label 'cpu'
+  tag { sample_id }
+  label 'cpu'
 
-    container params.container_trq
+  container params.container_trq
 
-    input:
-    tuple val(sample_id), val(work_dir)
-    path   reference
+  input:
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root)
+  path reference
 
-    output:
-    tuple val(sample_id), val(work_dir), val("${work_dir}/results/${sample_id}/aligned_files/demuxed_aligned.bam")
+  output:
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path("demuxed_aligned.bam")
 
-    script:
-    """
-    tranquillyzer align \\
-        ${params.align_opts} \\
-        ${work_dir}/results/${sample_id} \\
-        ${reference} \\
-        ${work_dir}/results/${sample_id} \\
-      > ${work_dir}/logs/${sample_id}_align.log 2>&1
-    """
+  script:
+  """
+  set -euo pipefail
+
+  mkdir -p "${log_root}/align"
+
+  tranquillyzer align \\
+    ${params.align_opts} \\
+    "${run_dir}" \\
+    "${reference}" \\
+    "${run_dir}" \\
+    > "${log_root}/align/${sample_id}.log" 2>&1
+
+  cp -f "${run_dir}/aligned_files/demuxed_aligned.bam" demuxed_aligned.bam
+  """
 }
