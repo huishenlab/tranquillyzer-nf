@@ -79,7 +79,6 @@ jobs:
           nextflow run . \
             -profile docker \
             -work-dir "${NXF_WORK}" \
-            -c "conf/tests/params_${NF_TEST_CASE}.config" \
             --outdir "${NF_OUTDIR}" \
             -resume \
             -with-report "${NF_OUTDIR}/pipeline_info/execution_report.html" \
