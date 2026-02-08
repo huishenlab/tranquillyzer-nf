@@ -65,7 +65,7 @@ workflow TRANQUILLYZER_PIPELINE {
   if( params.featurecounts ) {
     fc_ch = FEATURECOUNTS_MTX(split_ch, gtf_file, fc_script)
       .map { sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, counts_matrix_tsv ->
-        tuple(sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, counts_matrix_tsv.parent)
+        tuple(sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, "${run_dir}/featurecounts")
       }
   } else {
     // add an empty featurecounts placeholder so LOAD_RESULTS always receives 7-tuple

@@ -13,7 +13,7 @@ process FEATURECOUNTS_MTX {
 
   output:
   // (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, counts_matrix_tsv)
-  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path(split_bams_dir), path("featurecounts/counts_matrix.tsv")
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path(split_bams_dir), path("counts_matrix.tsv")
 
   script:
   """
@@ -31,5 +31,6 @@ process FEATURECOUNTS_MTX {
 
   # Ensure required output exists for Nextflow output collection.
   test -s featurecounts/counts_matrix.tsv
+  cp -f featurecounts/counts_matrix.tsv counts_matrix.tsv
   """
 }
