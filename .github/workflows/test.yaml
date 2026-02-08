@@ -37,6 +37,7 @@ jobs:
       - name: Install Nextflow
         run: |
           set -euo pipefail
+          export NXF_VER=25.04.7
           curl -s https://get.nextflow.io | bash
           sudo mv nextflow /usr/local/bin/nextflow
           nextflow -version
@@ -60,7 +61,6 @@ jobs:
 
           nextflow run . \
             -profile docker \
-            
             -c conf/tests/params_${NF_TEST_CASE}.config \
             --samplesheet tests/samplesheet.txt \
             --reference tests/references/hg38_gencode_chr21.fa \
