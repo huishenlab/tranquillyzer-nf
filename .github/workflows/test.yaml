@@ -1,63 +1,86 @@
-env:
-  NF_TEST_CASE: ${{ matrix.dataset }}
-  NF_TEST_OUTDIR: tests/${{ matrix.dataset }}/results
-  # Cache location for Singularity/Apptainer images
-  NXF_SINGULARITY_CACHEDIR: ${{ github.workspace }}/.singularity-cache
+name: run CI
 
-steps:
-  - uses: actions/checkout@v4
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
 
-  - name: Set up Java (Nextflow requires it)
-    uses: actions/setup-java@v4
-    with:
-      distribution: temurin
-      java-version: "17"
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
-  - name: Install Nextflow
-    run: |
-      set -euo pipefail
-      curl -s https://get.nextflow.io | bash
-      sudo mv nextflow /usr/local/bin/nextflow
-      nextflow -version
+jobs:
+  nextflow-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
 
-  - name: Install SingularityCE (container engine)
-    run: |
-      set -euo pipefail
-      sudo apt-get update
-      sudo apt-get install -y singularity-container
-      singularity --version
+    strategy:
+      fail-fast: false
+      matrix:
+        dataset: ["10x3p"]
 
-  - name: Debug - show test config and inputs
-    run: |
-      set -euo pipefail
-      echo "Workspace: $GITHUB_WORKSPACE"
-      ls -lah conf/tests || true
-      ls -lah tests || true
-      test -f "conf/tests/params_${NF_TEST_CASE}.config"
-      test -f "tests/samplesheet.txt"
-      test -f "tests/references/hg38_gencode_chr21.fa"
-      test -f "tests/references/gencode.v30.annotation_chr21.gtf"
+    env:
+      NF_TEST_CASE: ${{ matrix.dataset }}
+      NF_TEST_OUTDIR: tests/${{ matrix.dataset }}/results
 
-  - name: Cache Singularity images
-    uses: actions/cache@v4
-    with:
-      path: .singularity-cache
-      key: singularity-images-${{ runner.os }}-${{ matrix.dataset }}-v1
+      # Cache dir for Singularity images (works reliably on GitHub runners)
+      NXF_SINGULARITY_CACHEDIR: ${{ github.workspace }}/.singularity-cache
 
-  - name: Run Nextflow (local CPU) for ${{ matrix.dataset }}
-    run: |
-      set -euo pipefail
+    steps:
+      - uses: actions/checkout@v4
 
-      rm -rf "${NF_TEST_OUTDIR}"
-      mkdir -p "${NXF_SINGULARITY_CACHEDIR}"
+      - name: Set up Java (Nextflow requires it)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
-      nextflow run . \
-        -resume \
-        -profile singularity \
-        -c conf/tests/params_${NF_TEST_CASE}.config \
-        --samplesheet tests/samplesheet.txt \
-        --reference tests/references/hg38_gencode_chr21.fa \
-        --gtf tests/references/gencode.v30.annotation_chr21.gtf \
-        --outdir tests/10x3p \
-        --enable_gpu false \
-        --cleanup_transform true
+      - name: Install Nextflow
+        run: |
+          set -euo pipefail
+          curl -s https://get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/nextflow
+          nextflow -version
+
+      - name: Install SingularityCE (recommended on ubuntu-latest)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y singularity-container
+          singularity --version
+
+      - name: Debug - show test config and inputs
+        run: |
+          set -euo pipefail
+          echo "Workspace: $GITHUB_WORKSPACE"
+          ls -lah conf/tests || true
+          ls -lah tests || true
+          test -f "conf/tests/params_${NF_TEST_CASE}.config"
+          test -f "tests/samplesheet.txt"
+          test -f "tests/references/hg38_gencode_chr21.fa"
+          test -f "tests/references/gencode.v30.annotation_chr21.gtf"
+
+      - name: Cache Singularity image cache
+        uses: actions/cache@v4
+        with:
+          path: .singularity-cache
+          key: singularity-images-${{ runner.os }}-${{ matrix.dataset }}-v1
+
+      - name: Run Nextflow (Singularity) for ${{ matrix.dataset }}
+        run: |
+          set -euo pipefail
+
+          rm -rf "${NF_TEST_OUTDIR}"
+
+          nextflow run . \
+            -resume \
+            -profile singularity \
+            -c conf/tests/params_${NF_TEST_CASE}.config \
+            --samplesheet tests/samplesheet.txt \
+            --reference tests/references/hg38_gencode_chr21.fa \
+            --gtf tests/references/gencode.v30.annotation_chr21.gtf \
+            --outdir tests/10x3p \
+            --enable_gpu false \
+            --cleanup_transform true
