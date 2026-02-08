@@ -6,35 +6,32 @@ process FEATURECOUNTS_MTX {
   label 'subread'
 
   input:
+  // (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir)
   tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path(split_bams_dir)
   path gtf
   path fc_script
 
   output:
-  tuple val(sample_id),
-        path(run_dir),
-        path(load_root),
-        path(log_root),
-        path(dup_bam),
-        path(split_bams_dir),
-        path("${run_dir}/featurecounts", type: 'dir')
+  // (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir, featurecounts_dir)
+  tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path(split_bams_dir), path("featurecounts", type: 'dir')
+
+  publishDir { "${run_dir}/featurecounts" }, mode: 'copy', overwrite: true
 
   script:
   """
   set -euo pipefail
 
   mkdir -p "${log_root}/featurecounts"
-  rm -rf "${run_dir}/featurecounts"
-  mkdir -p "${run_dir}/featurecounts"
+  mkdir -p featurecounts
 
   python "${fc_script}" \\
     --bam-dir "${split_bams_dir}" \\
     --gtf "${gtf}" \\
-    --out-dir "${run_dir}/featurecounts" \\
+    --out-dir "featurecounts" \\
     ${params.featurecounts_opts} \\
     > "${log_root}/featurecounts/${sample_id}.log" 2>&1
 
-  # Make sure it is non-empty
-  echo "OK" > "${run_dir}/featurecounts/SUCCESS"
+  # Sentinel ensures directory is never "empty" and always detectable
+  echo "OK" > featurecounts/.nf_success
   """
 }
