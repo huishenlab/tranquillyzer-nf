@@ -1,5 +1,3 @@
-nextflow.enable.dsl = 2
-
 process READ_LENGTH_DIST_QC {
 
   tag { sample_id }

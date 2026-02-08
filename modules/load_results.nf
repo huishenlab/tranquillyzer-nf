@@ -1,5 +1,3 @@
-nextflow.enable.dsl = 2
-
 process LOAD_RESULTS {
 
   tag { sample_id }

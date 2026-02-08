@@ -1,5 +1,3 @@
-nextflow.enable.dsl = 2
-
 process ALIGN {
 
   tag { sample_id }

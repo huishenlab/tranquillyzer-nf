@@ -1,5 +1,3 @@
-nextflow.enable.dsl = 2
-
 process ANNOTATE_READS {
 
   tag { sample_id }

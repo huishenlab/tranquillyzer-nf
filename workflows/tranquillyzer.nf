@@ -1,6 +1,3 @@
-// workflows/tranquillyzer.nf
-nextflow.enable.dsl = 2
-
 include { PREPROCESS          } from '../modules/preprocess'
 include { READ_LENGTH_DIST_QC } from '../modules/read_length_dist_qc'
 include { ANNOTATE_READS      } from '../modules/annotate_reads'

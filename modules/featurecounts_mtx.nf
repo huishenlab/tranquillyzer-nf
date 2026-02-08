@@ -1,5 +1,3 @@
-nextflow.enable.dsl = 2
-
 process FEATURECOUNTS_MTX {
 
   tag "${sample_id}"
@@ -19,7 +17,7 @@ process FEATURECOUNTS_MTX {
         path(log_root),
         path(dup_bam),
         path(split_bams_dir),
-        path("featurecounts", type: 'dir')
+        path("${run_dir}/featurecounts", type: 'dir')
 
   script:
   """
@@ -31,7 +29,7 @@ process FEATURECOUNTS_MTX {
   python "${fc_script}" \\
     --bam-dir "${split_bams_dir}" \\
     --gtf "${gtf}" \\
-    --out-dir "featurecounts" \\
+    --out-dir "${run_dir}/featurecounts" \\
     ${params.featurecounts_opts} \\
     > "${log_root}/featurecounts/${sample_id}.log" 2>&1
 
