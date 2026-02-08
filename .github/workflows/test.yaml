@@ -5,6 +5,7 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -23,17 +24,12 @@ jobs:
 
     env:
       NXF_VER: "24.10.4"
-      NXF_ANSI_LOG: false
+      NXF_ANSI_LOG: "false"
       NXF_OPTS: "-Xms1g -Xmx4g"
       NF_TEST_CASE: ${{ matrix.dataset }}
 
-      # Use ephemeral dirs (don’t litter repo, easier artifact capture)
+      # Keep outdir under workspace so artifacts can be uploaded reliably
       NF_OUTDIR: ${{ github.workspace }}/tests/${{ matrix.dataset }}
-      NXF_WORK:  ${{ runner.temp }}/nf-work/${{ matrix.dataset }}
-      NXF_HOME:  ${{ runner.temp }}/nf-home
-
-      # Docker cache location for Apptainer/Singularity not needed here
-      # because CI uses docker.
 
     steps:
       - name: Checkout
@@ -59,8 +55,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ${{ env.NXF_HOME }}
-            ${{ env.NXF_WORK }}
+            ~/.nextflow
+            ${{ github.workspace }}/.nf-work
           key: nf-${{ runner.os }}-${{ env.NXF_VER }}-${{ matrix.dataset }}-${{ hashFiles('**/*.nf', 'nextflow.config', 'conf/**/*.config') }}
           restore-keys: |
             nf-${{ runner.os }}-${{ env.NXF_VER }}-${{ matrix.dataset }}-
@@ -70,11 +66,16 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Use runner temp at runtime (not in expressions)
+          export NXF_HOME="${RUNNER_TEMP}/nf-home"
+          export NXF_WORK="${RUNNER_TEMP}/nf-work/${NF_TEST_CASE}"
+
           mkdir -p "${NXF_HOME}" "${NXF_WORK}"
           rm -rf "${NF_OUTDIR}"
 
-          # Prefer profiles for infra (docker) and small test configs for params.
-          # We pass outdir explicitly so ETL layout is predictable in CI.
+          # Also keep a workspace work dir for caching (optional)
+          mkdir -p "${GITHUB_WORKSPACE}/.nf-work"
+
           nextflow run . \
             -profile docker \
             -work-dir "${NXF_WORK}" \
@@ -98,8 +99,7 @@ jobs:
           # At least one sample folder should exist under load
           test "$(find "${NF_OUTDIR}/load" -mindepth 1 -maxdepth 1 -type d | wc -l)" -ge 1
 
-          # Example expected payloads (don’t over-constrain; keep resilient)
-          # Check that BAM exists somewhere in load/*/bam
+          # BAM exists somewhere in load/*/bam
           test "$(find "${NF_OUTDIR}/load" -type f -name 'demuxed_aligned_dup_marked.bam' | wc -l)" -ge 1
 
       - name: Upload artifacts (always)
