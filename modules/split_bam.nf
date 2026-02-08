@@ -4,15 +4,12 @@ process SPLIT_BAM {
 
   tag { sample_id }
   label 'cpu'
-
   container params.container_trq
 
   input:
   tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam)
 
   output:
-  // standardized tuple for downstream:
-  // (sid, run_dir, load_root, log_root, dup_bam, split_bams_dir)
   tuple val(sample_id), path(run_dir), path(load_root), path(log_root), path(dup_bam), path("split_bams", type: 'dir')
 
   script:
@@ -23,7 +20,6 @@ process SPLIT_BAM {
   mkdir -p "${run_dir}/aligned_files/split_bams"
   mkdir -p "${run_dir}/aligned_files"
 
-  # Ensure expected location for split-bam
   cp -f "${dup_bam}" "${run_dir}/aligned_files/demuxed_aligned_dup_marked.bam"
 
   tranquillyzer split-bam \\
@@ -32,7 +28,6 @@ process SPLIT_BAM {
     "${run_dir}/aligned_files/demuxed_aligned_dup_marked.bam" \\
     > "${log_root}/split_bam/${sample_id}.log" 2>&1
 
-  # Stage outputs into the task workdir for Nextflow
   cp -R "${run_dir}/aligned_files/split_bams" ./split_bams
   """
 }
