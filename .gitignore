@@ -8,6 +8,8 @@
 tests/*
 !bin/
 !bin/**
+!lib/
+!lib/**
 !tests/samplesheet.txt
 !tests/10x3p/data/
 !tests/10x3p/data/**
