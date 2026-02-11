@@ -47,13 +47,17 @@ Included steps:
   - **Singularity / Apptainer**
 - Optional: GPU-capable nodes for accelerated annotation + compatible CUDA stack on the host (for GPU acceleration)
 
+---
+
 ### Repository layout
 * **nextflow.config:** Global defaults + profiles (infra + container engine) + reporting.
 * **conf/params.config:** Pipeline parameters (inputs, toggles, tool options, containers, throttling).
 
+---
+
 ### Inputs
 
-#### Samplesheet (TSV)
+#### <u>Samplesheet (TSV)</u>
 
 Your samplesheet must be a TSV with:
 * sample_id
@@ -62,28 +66,28 @@ Your samplesheet must be a TSV with:
 
 The pipeline expects --samplesheet to point to this TSV.
 
-#### Reference
+#### <u>Reference</u>
 * --reference (required)
 * --gtf (optional; required if --featurecounts true)
 
-### Parameters
+### <u>Parameters</u>
 
 All parameters come from conf/params.config (and can be overridden on the CLI or via an additional -c config).
 
-#### Required
+#### <u>Required</u>
 *	--samplesheet : path to samplesheet TSV
 *	--reference   : reference FASTA (or appropriate reference expected by your aligner wrapper)
 *	--outdir      : output directory (default ./results)
 
-#### Optional
+#### <u>Optional</u>
 * --gtf : annotation GTF (needed for featureCounts)
 
-#### Pipeline toggles
+#### <u>Pipeline toggles</u>
 *	--split_bam (default true)
 *	--featurecounts (default true)
 *	--cleanup_transform (default false)
 
-### Containers
+#### <u>Containers</u>
 
 Defaults (from conf/params.config):
 *	--container_trq : varishenlab/tranquillyzer:tranquillyzer_v0.2.1_tf2.15.0
@@ -103,7 +107,7 @@ Optional CUDA library path injection (mostly for Apptainer/Singularity sites):
 *	--cuda_lib_dir (default "")
 *	populates APPTAINERENV_LD_LIBRARY_PATH and LD_LIBRARY_PATH when set
 
-### Throttling / maxForks
+#### <u>Throttling / maxForks</u>
 
 Global executor queue throttle:
 *	--queueSize (default 10)
@@ -124,6 +128,8 @@ Tool options (examples)
 *	--dedup_opts
 *	--split_bam_opts
 *	--featurecounts_opts
+
+---
 
 ### Profiles
 
@@ -205,3 +211,4 @@ nextflow run AyushSemwal/tranquillyzer-nf -r v0.2.1 \
   --gpus 1 \
   -resume
 ```
+---
