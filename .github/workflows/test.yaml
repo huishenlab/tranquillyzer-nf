@@ -22,7 +22,7 @@ jobs:
         include:
           - dataset: "10x3p"
             samplesheet: "tests/samplesheet.txt"
-            outdir: "tests/10x3p"
+            outdir: "tests/10x3p_with_wl"
             run_name: "with_whitelist"
           - dataset: "10x3p"
             samplesheet: "tests/samplesheet_no_wl.txt"
