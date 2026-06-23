@@ -1,12 +1,11 @@
 process FEATURECOUNTS_MTX {
 
   tag "${sample_id}"
-  label 'subread'
+  label 'cpu'
 
   input:
   tuple val(sample_id), val(work_dir), val(bam_dir)
   path gtf
-  path fc_script
 
   output:
   tuple val(sample_id), val(work_dir), val("${work_dir}/results/${sample_id}/featurecounts")
@@ -21,11 +20,11 @@ process FEATURECOUNTS_MTX {
   echo "[debug] bam_dir=${bam_dir}" > "${work_dir}/logs/${sample_id}_featurecounts_mtx.log"
   ls -lah "${bam_dir}" >> "${work_dir}/logs/${sample_id}_featurecounts_mtx.log" 2>&1 || true
 
-  python "${fc_script}" \\
-    --bam-dir "${bam_dir}" \\
-    --gtf "${gtf}" \\
-    --out-dir "${work_dir}/results/${sample_id}/featurecounts" \\
+  tranquillyzer featurecounts \\
     ${params.featurecounts_opts} \\
+    "${bam_dir}" \\
+    "${gtf}" \\
+    "${work_dir}/results/${sample_id}/featurecounts" \\
     >> "${work_dir}/logs/${sample_id}_featurecounts_mtx.log" 2>&1
 
   # guard

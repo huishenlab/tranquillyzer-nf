@@ -19,11 +19,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dataset: ["10x3p"]
+        include:
+          - dataset: "10x3p"
+            samplesheet: "tests/samplesheet.txt"
+            outdir: "tests/10x3p"
+            run_name: "with_whitelist"
+          - dataset: "10x3p"
+            samplesheet: "tests/samplesheet_no_wl.txt"
+            outdir: "tests/10x3p_no_wl"
+            run_name: "no_whitelist"
 
     env:
       NF_TEST_CASE: ${{ matrix.dataset }}
-      NF_TEST_OUTDIR: tests/${{ matrix.dataset }}/results
+      NF_TEST_SAMPLESHEET: ${{ matrix.samplesheet }}
+      NF_TEST_OUTDIR: ${{ matrix.outdir }}
+      # Bump when the upstream model bundle archive changes (invalidates the cache).
+      MODEL_REGISTRY_VERSION: v1
 
     steps:
       - uses: actions/checkout@v4
@@ -42,18 +53,25 @@ jobs:
           sudo mv nextflow /usr/local/bin/nextflow
           nextflow -version
 
+      - name: Cache tranquillyzer model bundles
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/models
+          key: tranquillyzer-models-${{ env.MODEL_REGISTRY_VERSION }}
+
       - name: Debug - show test config and inputs
         run: |
           set -euo pipefail
           echo "Workspace: $GITHUB_WORKSPACE"
+          echo "Run: ${{ matrix.run_name }}"
           ls -lah conf/tests || true
           ls -lah tests || true
           test -f "conf/tests/params_${NF_TEST_CASE}.config"
-          test -f "tests/samplesheet.txt"
+          test -f "${NF_TEST_SAMPLESHEET}"
           test -f "tests/references/hg38_gencode_chr21.fa"
           test -f "tests/references/gencode.v30.annotation_chr21.gtf"
 
-      - name: Run Nextflow (local CPU) for ${{ matrix.dataset }}
+      - name: Run Nextflow (local CPU) for ${{ matrix.run_name }}
         run: |
           set -euo pipefail
 
@@ -62,9 +80,9 @@ jobs:
           nextflow run . \
             -profile docker \
             -c conf/tests/params_${NF_TEST_CASE}.config \
-            --samplesheet tests/samplesheet.txt \
+            --samplesheet "${NF_TEST_SAMPLESHEET}" \
             --reference tests/references/hg38_gencode_chr21.fa \
             --gtf tests/references/gencode.v30.annotation_chr21.gtf \
-            --outdir tests/10x3p \
+            --outdir "${NF_TEST_OUTDIR}" \
             --enable_gpu false \
             --cleanup_transform true

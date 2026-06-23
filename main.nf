@@ -53,8 +53,7 @@ workflow {
     params.outdir,
     params.samplesheet,
     params.reference,
-    params.container_trq,
-    params.container_subread
+    params.container_trq
   )
 
   // 2) Provenance (JSON)

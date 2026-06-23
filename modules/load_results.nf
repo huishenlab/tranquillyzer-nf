@@ -83,6 +83,17 @@ process LOAD_RESULTS {
     cp -a "\${SAMPLE_ROOT}/plots/." "\${DEST}/reports/plots/" || true
   fi
 
+  # 8) QC metrics report (optional; from tranquillyzer qc-metrics)
+  if [ -d "\${SAMPLE_ROOT}/qc" ]; then
+    mkdir -p "\${DEST}/reports/qc"
+    cp -a "\${SAMPLE_ROOT}/qc/." "\${DEST}/reports/qc/" || true
+  fi
+
+  # 9) Whitelist produced by generate-whitelist (no-whitelist branch)
+  if [ -f "\${SAMPLE_ROOT}/annotation_metadata/${params.whitelist_filename}" ]; then
+    cp -f "\${SAMPLE_ROOT}/annotation_metadata/${params.whitelist_filename}" "\${DEST}/tables/"
+  fi
+
   # Stable marker artifact
   echo "\${DEST}" > "\${DEST}/LOAD_PATH.txt"
   """
