@@ -6,11 +6,10 @@
 !LICENSE
 !tests/
 tests/*
-!bin/
-!bin/**
 !lib/
 !lib/**
 !tests/samplesheet.txt
+!tests/samplesheet_no_wl.txt
 !tests/10x3p/data/
 !tests/10x3p/data/**
 !tests/10x3p/barcodes.tsv
@@ -30,6 +29,8 @@ tests/*
 !modules/**
 !conf/
 !conf/**
+!assets/
+!assets/**
 
 # Unignore core files
 !main.nf

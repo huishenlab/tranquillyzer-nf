@@ -46,7 +46,6 @@ workflow PIPELINE_INITIALISATION {
   samplesheet_in
   reference_in
   container_trq_in
-  container_subread_in
 
   main:
 
@@ -68,13 +67,21 @@ workflow PIPELINE_INITIALISATION {
   outdir_path.mkdirs()
   def out_abs = outdir_path.toAbsolutePath().toString()
 
+  // Logs now live under transform/logs/ (created by modules on first write);
+  // no separate top-level outdir/logs/.
   def extract_root   = file("${out_abs}/extract")
   def transform_root = file("${out_abs}/transform")
   def load_root      = file("${out_abs}/load")
-  def log_root       = file("${out_abs}/logs")
   def info_root      = file("${out_abs}/pipeline_info")
 
-  [extract_root, transform_root, load_root, log_root, info_root].each { it.mkdirs() }
+  [extract_root, transform_root, load_root, info_root].each { it.mkdirs() }
+
+  // Sentinel used when a samplesheet row has no pre-supplied whitelist.
+  // Downstream modules detect this by basename == 'NO_WHITELIST' and route through
+  // the generate-whitelist + barcode-correct branch instead of passing --whitelist-file.
+  def no_wl_sentinel = file("${workflow.projectDir}/assets/NO_WHITELIST")
+  if( !no_wl_sentinel.exists() )
+    error "Internal error: sentinel file ${no_wl_sentinel} is missing. Re-check the repo assets/ directory."
 
   log.info "=========================================="
   log.info " Tranquillyzer-NF initialisation (ETL roots created)"
@@ -83,17 +90,16 @@ workflow PIPELINE_INITIALISATION {
   log.info " outdir                   : ${outdir_path}"
   log.info " reference                : ${reference_path}"
   log.info " Tranquillyzer container  : ${container_trq_in}"
-  log.info " featureCounts container  : ${container_subread_in}"
   log.info " ETL extract_root         : ${extract_root}"
   log.info " ETL transform_root       : ${transform_root}"
   log.info " ETL load_root            : ${load_root}"
-  log.info " ETL log_root             : ${log_root}"
   log.info " ETL pipeline_info        : ${info_root}"
   log.info "=========================================="
 
   /*
    * Parse samplesheet TSV (header required).
-   * Required columns: sample_id, raw_dir, metadata
+   * Required columns: sample_id, raw_dir
+   * Optional column : metadata  (whitelist TSV; if empty, the pipeline auto-generates one)
    *
    * work_dir is the absolute outdir (same as old pipeline behavior).
    */
@@ -103,21 +109,28 @@ workflow PIPELINE_INITIALISATION {
     .map { row ->
       if( !row.sample_id ) error "Samplesheet missing required column 'sample_id' (or empty value)."
       if( !row.raw_dir )   error "Samplesheet missing required column 'raw_dir' (or empty value) for sample '${row.sample_id}'."
-      if( !row.metadata )  error "Samplesheet missing required column 'metadata' (or empty value) for sample '${row.sample_id}'."
 
       def sample_id = row.sample_id.toString().trim()
       def raw_dir   = file(row.raw_dir.toString().trim())
-      def metadata  = file(row.metadata.toString().trim())
+
+      def metadata_str = row.containsKey('metadata') ? (row.metadata?.toString()?.trim() ?: '') : ''
+      def metadata
+      if( metadata_str ) {
+        metadata = file(metadata_str)
+        if( !metadata.exists() )
+          error "metadata file not found for sample '${sample_id}': ${metadata}"
+      } else {
+        metadata = no_wl_sentinel
+      }
 
       if( !raw_dir.exists() )  error "raw_dir not found for sample '${sample_id}': ${raw_dir}"
-      if( !metadata.exists() ) error "metadata file not found for sample '${sample_id}': ${metadata}"
 
       def work_dir = out_abs  // <-- old behavior: everything under outdir
 
       tuple(sample_id, raw_dir, work_dir, metadata)
     }
     .ifEmpty {
-      error "Samplesheet parsed to 0 rows. Ensure TSV header + required columns: sample_id, raw_dir, metadata."
+      error "Samplesheet parsed to 0 rows. Ensure TSV header + required columns: sample_id, raw_dir (metadata is optional)."
     }
 
   /*
