@@ -13,7 +13,7 @@ process ANNOTATE_READS {
   """
   set -euo pipefail
 
-  mkdir -p "${work_dir}/logs"
+  mkdir -p "${work_dir}/transform/logs"
 
   # When no whitelist is supplied, the samplesheet parser stages the
   # assets/NO_WHITELIST sentinel. Run annotate-reads without demux/correction
@@ -24,8 +24,8 @@ process ANNOTATE_READS {
       ${params.annotate_reads_opts} \\
       --seq-order-file "${params.seq_orders_in_container_path}" \\
       --models-dir "${params.models_dir}" \\
-      "${work_dir}/results/${sample_id}" \\
-      > "${work_dir}/logs/${sample_id}_annotate_reads.log" 2>&1
+      "${work_dir}/transform/${sample_id}" \\
+      > "${work_dir}/transform/logs/${sample_id}_annotate_reads.log" 2>&1
   else
     tranquillyzer annotate-reads \\
       ${params.annotate_reads_opts} \\
@@ -34,8 +34,8 @@ process ANNOTATE_READS {
       --whitelist-file "${metadata}" \\
       --run-barcode-correction \\
       --run-demux \\
-      "${work_dir}/results/${sample_id}" \\
-      > "${work_dir}/logs/${sample_id}_annotate_reads.log" 2>&1
+      "${work_dir}/transform/${sample_id}" \\
+      > "${work_dir}/transform/logs/${sample_id}_annotate_reads.log" 2>&1
   fi
   """
 }

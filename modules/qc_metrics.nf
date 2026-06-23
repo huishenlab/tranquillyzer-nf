@@ -17,17 +17,17 @@ process QC_METRICS {
   """
   set -euo pipefail
 
-  mkdir -p "${work_dir}/logs"
-  mkdir -p "${work_dir}/results/${sample_id}/qc"
+  mkdir -p "${work_dir}/transform/logs"
+  mkdir -p "${work_dir}/transform/${sample_id}/qc"
 
   tranquillyzer qc-metrics \\
     ${params.qc_metrics_opts} \\
     --sample-name "${sample_id}" \\
-    --output-dir "${work_dir}/results/${sample_id}/qc" \\
+    --output-dir "${work_dir}/transform/${sample_id}/qc" \\
     ${bam_flag} \\
     ${counts_flag} \\
     ${gtf_flag} \\
-    "${work_dir}/results/${sample_id}" \\
-    > "${work_dir}/logs/${sample_id}_qc_metrics.log" 2>&1
+    "${work_dir}/transform/${sample_id}" \\
+    > "${work_dir}/transform/logs/${sample_id}_qc_metrics.log" 2>&1
   """
 }

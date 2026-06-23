@@ -67,13 +67,14 @@ workflow PIPELINE_INITIALISATION {
   outdir_path.mkdirs()
   def out_abs = outdir_path.toAbsolutePath().toString()
 
+  // Logs now live under transform/logs/ (created by modules on first write);
+  // no separate top-level outdir/logs/.
   def extract_root   = file("${out_abs}/extract")
   def transform_root = file("${out_abs}/transform")
   def load_root      = file("${out_abs}/load")
-  def log_root       = file("${out_abs}/logs")
   def info_root      = file("${out_abs}/pipeline_info")
 
-  [extract_root, transform_root, load_root, log_root, info_root].each { it.mkdirs() }
+  [extract_root, transform_root, load_root, info_root].each { it.mkdirs() }
 
   // Sentinel used when a samplesheet row has no pre-supplied whitelist.
   // Downstream modules detect this by basename == 'NO_WHITELIST' and route through
@@ -92,7 +93,6 @@ workflow PIPELINE_INITIALISATION {
   log.info " ETL extract_root         : ${extract_root}"
   log.info " ETL transform_root       : ${transform_root}"
   log.info " ETL load_root            : ${load_root}"
-  log.info " ETL log_root             : ${log_root}"
   log.info " ETL pipeline_info        : ${info_root}"
   log.info "=========================================="
 

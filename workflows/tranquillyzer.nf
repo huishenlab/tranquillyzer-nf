@@ -190,17 +190,22 @@ workflow TRANQUILLYZER_PIPELINE {
       .map { sid, wd, dup_bam, fc_dir -> tuple(sid, wd, dup_bam, fc_dir) }
 
     def qc_gtf = params.gtf ? file(params.gtf) : file("${workflow.projectDir}/assets/NO_WHITELIST")
-    QC_METRICS(qc_input_ch, qc_gtf)
+    qc_done_ch = QC_METRICS(qc_input_ch, qc_gtf)  // (sid, wd)
+
+    // Gate LOAD_RESULTS on QC completion so the qc/ subdir is present when we copy.
+    load_in_ch = featurecounts_ch
+      .join(qc_done_ch.map { sid, wd -> tuple(sid, 'qc-done') })
+      .map { sid, wd, fc_dir, _qc -> tuple(sid, wd, fc_dir) }
+  } else {
+    load_in_ch = featurecounts_ch
   }
 
   /*
-   * ETL rearrangement happens only here.
-   * LOAD_RESULTS will:
-   * - create: outdir/{extract,transform,load,logs,pipeline_info}
-   * - optionally move/copy: results + logs into transform/
-   * - stage a curated load/ tree
+   * Stage curated load/ tree from the live transform/<sample>/. No duplicating
+   * snapshots. With --cleanup_transform true, LOAD_RESULTS deletes
+   * transform/<sample>/ after the load copy completes (logs preserved).
    */
-  loaded_ch = LOAD_RESULTS(featurecounts_ch)
+  loaded_ch = LOAD_RESULTS(load_in_ch)
 
   emit:
   final_outputs = loaded_ch

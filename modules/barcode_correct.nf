@@ -13,14 +13,14 @@ process BARCODE_CORRECT {
   """
   set -euo pipefail
 
-  mkdir -p "${work_dir}/logs"
+  mkdir -p "${work_dir}/transform/logs"
 
   tranquillyzer barcode-correct \\
     ${params.barcode_correct_opts} \\
     --seq-order-file "${params.seq_orders_in_container_path}" \\
     --run-demux \\
-    "${work_dir}/results/${sample_id}" \\
+    "${work_dir}/transform/${sample_id}" \\
     "${whitelist_path}" \\
-    > "${work_dir}/logs/${sample_id}_barcode_correct.log" 2>&1
+    > "${work_dir}/transform/logs/${sample_id}_barcode_correct.log" 2>&1
   """
 }

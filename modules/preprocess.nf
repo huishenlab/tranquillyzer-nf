@@ -13,13 +13,13 @@ process PREPROCESS {
   """
   set -euo pipefail
 
-  mkdir -p "${work_dir}/results/${sample_id}"
-  mkdir -p "${work_dir}/logs"
+  mkdir -p "${work_dir}/transform/${sample_id}"
+  mkdir -p "${work_dir}/transform/logs"
 
   tranquillyzer preprocess \\
     ${params.preprocess_opts} \\
     "${raw_dir}" \\
-    "${work_dir}/results/${sample_id}" \\
-    > "${work_dir}/logs/${sample_id}_preprocess.log" 2>&1
+    "${work_dir}/transform/${sample_id}" \\
+    > "${work_dir}/transform/logs/${sample_id}_preprocess.log" 2>&1
   """
 }
